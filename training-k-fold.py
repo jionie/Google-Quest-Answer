@@ -44,8 +44,8 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--optimizer', type=str, default='Adam', required=False, help='specify the optimizer')
-parser.add_argument("--lr_scheduler", type=str, default='WarmRestart', required=False, help="specify the lr scheduler")
+parser.add_argument('--optimizer', type=str, default='Ranger', required=False, help='specify the optimizer')
+parser.add_argument("--lr_scheduler", type=str, default='CosineAnealing', required=False, help="specify the lr scheduler")
 parser.add_argument("--lr", type=int, default=1e-3, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
@@ -163,7 +163,7 @@ def training(fold,
 
     ############################################################################### optimizer
     if optimizer_name == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     elif optimizer_name == "Ranger":
         optimizer = Ranger(filter(lambda p: p.requires_grad, model.parameters()), lr, weight_decay=1e-5)
     else:
@@ -218,30 +218,30 @@ def training(fold,
         pred_val     = None
         
         # update lr and start from start_epoch  
-        # if (not lr_scheduler_each_iter):
-        #     if epoch < 10:
-        #         if epoch != 0:
-        #             scheduler.step()
-        #             scheduler = warm_restart(scheduler, T_mult=2) 
-        #     elif epoch > 10 and epoch < 25:
-        #         optimizer.param_groups[0]['lr'] = 1e-4
-        #     elif epoch > 25 and epoch < 35:
-        #         optimizer.param_groups[0]['lr'] = 1e-5
-        #     else:
-        #         optimizer.param_groups[0]['lr'] = 5e-6
+        if (not lr_scheduler_each_iter):
+            if epoch < 6:
+                if epoch != 1:
+                    scheduler.step()
+                    # scheduler = warm_restart(scheduler, T_mult=2) 
+            elif epoch < 11:
+                optimizer.param_groups[0]['lr'] = 1e-4
+            elif epoch < 21:
+                optimizer.param_groups[0]['lr'] = 1e-5
+            else:
+                optimizer.param_groups[0]['lr'] = 5e-6
                 
-        affect_rate = CosineAnnealingWarmUpRestarts(epoch, T_0=num_epoch, T_warmup=5, gamma=0.8,)
-        optimizer.param_groups[0]['lr'] = affect_rate * lr
+        # affect_rate = CosineAnnealingWarmUpRestarts(epoch, T_0=num_epoch, T_warmup=5, gamma=0.8,)
+        # optimizer.param_groups[0]['lr'] = affect_rate * lr
         
-        if epoch < 5:
-            optimizer.param_groups[0]['lr'] = affect_rate * lr
-        elif epoch < 10:
-            lr = 1e-4
-            optimizer.param_groups[0]['lr'] = affect_rate * lr
-        elif epoch < 20:
-            optimizer.param_groups[0]['lr'] = 5e-5
-        else:
-            optimizer.param_groups[0]['lr'] = 1e-5 
+        # if epoch < 5:
+        #     optimizer.param_groups[0]['lr'] = affect_rate * lr
+        # elif epoch < 10:
+        #     lr = 1e-4
+        #     optimizer.param_groups[0]['lr'] = affect_rate * lr
+        # elif epoch < 20:
+        #     optimizer.param_groups[0]['lr'] = 5e-5
+        # else:
+        #     optimizer.param_groups[0]['lr'] = 1e-5 
            
         if (epoch < start_epoch):
             continue
