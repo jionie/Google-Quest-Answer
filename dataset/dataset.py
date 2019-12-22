@@ -32,6 +32,8 @@ parser.add_argument('--val_batch_size', type=int, default=4, \
     required=False, help='specify the val_batch_size for testing dataloader')
 parser.add_argument('--num_workers', type=int, default=0, \
     required=False, help='specify the num_workers for testing dataloader')
+parser.add_argument('--model_type', type=str, default="bert-base-uncased", \
+    required=False, help='specify the model_type for BertTokenizer')
 
 
 ############################################ Define Dataset Contants
@@ -72,12 +74,15 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
                 'answer_type_reason_explanation',
                 'answer_well_written']
 
+
+############################################ Define Dataset 
+
 class QuestDataset(torch.utils.data.Dataset):
-    def __init__(self, df, train_mode=True, labeled=True):
+    def __init__(self, df, model_type="bert-base-uncased", train_mode=True, labeled=True):
         self.df = df
         self.train_mode = train_mode
         self.labeled = labeled
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.tokenizer = BertTokenizer.from_pretrained(model_type)
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
@@ -182,9 +187,9 @@ class QuestDataset(torch.utils.data.Dataset):
         else:
             return token_ids, seg_ids
 
-def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", batch_size=4):
+def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", model_type="bert-base-uncased", batch_size=4):
     df = pd.read_csv(data_path)
-    ds_test = QuestDataset(df, train_mode=False, labeled=False)
+    ds_test = QuestDataset(df, model_type, train_mode=False, labeled=False)
     loader = torch.utils.data.DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=ds_test.collate_fn, drop_last=False)
     loader.num = len(df)
     
@@ -214,6 +219,7 @@ def get_train_val_split(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Ans
 
 def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                         val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                        model_type="bert-base-uncased", \
                         batch_size=4, \
                         val_batch_size=4, \
                         num_workers=2):
@@ -225,11 +231,11 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
     print(df_train.shape)
     print(df_val.shape)
 
-    ds_train = QuestDataset(df_train, train_mode=True, labeled=True)
+    ds_train = QuestDataset(df_train, model_type, train_mode=True, labeled=True)
     train_loader = torch.utils.data.DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=ds_train.collate_fn, drop_last=True)
     train_loader.num = len(df_train)
 
-    ds_val = QuestDataset(df_val, train_mode=False)
+    ds_val = QuestDataset(df_val, model_type, train_mode=False)
     val_loader = torch.utils.data.DataLoader(ds_val, batch_size=val_batch_size, shuffle=False, num_workers=num_workers, collate_fn=ds_val.collate_fn, drop_last=False)
     val_loader.num = len(df_val)
     val_loader.df = df_val
@@ -257,12 +263,14 @@ def test_train_val_split(data_path, \
 
 def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                      val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                     model_type="bert-base-uncased", \
                      batch_size=4, \
                      val_batch_size=4, \
                      num_workers=2):
 
     train_loader, val_loader = get_train_val_loaders(train_data_path, \
                      val_data_path, \
+                     model_type, \
                      batch_size, \
                      val_batch_size, \
                      num_workers)
@@ -285,9 +293,11 @@ def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest
 
 
 def test_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
+                     model_type="bert-base-uncased", \
                      batch_size=4):
 
     loader = get_test_loader(data_path, \
+                            model_type, \
                             batch_size)
 
     for ids, seg_ids in loader:
@@ -315,10 +325,12 @@ if __name__ == "__main__":
 
     test_train_loader(train_data_path=train_data_path, \
                       val_data_path=val_data_path, \
+                      model_type=args.model_type, \
                       batch_size=args.batch_size, \
                       val_batch_size=args.val_batch_size, \
                       num_workers=args.num_workers)
 
     # test test_data_loader
     test_test_loader(data_path=args.test_data_path, \
+                     model_type=args.model_type, \
                      batch_size=args.val_batch_size)
