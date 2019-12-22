@@ -50,7 +50,7 @@ parser.add_argument("--lr", type=int, default=2e-3, required=False, help="specif
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=8, required=False, help="specify the batch size for validating")
 parser.add_argument("--num_epoch", type=int, default=100, required=False, help="specify the total epoch")
-parser.add_argument("--accumulation_steps", type=int, default=2, required=False, help="specify the accumulation steps")
+parser.add_argument("--accumulation_steps", type=int, default=4, required=False, help="specify the accumulation steps")
 parser.add_argument('--num_workers', type=int, default=0, \
     required=False, help='specify the num_workers for testing dataloader')
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
@@ -89,6 +89,7 @@ def training(fold,
             lr_scheduler_name,
             lr,
             batch_size,
+            valid_batch_size,
             num_epoch,
             start_epoch,
             accumulation_steps,
@@ -394,6 +395,7 @@ if __name__ == "__main__":
                 args.lr_scheduler, \
                 args.lr, \
                 args.batch_size, \
+                args.valid_batch_size, \
                 args.num_epoch, \
                 args.start_epoch, \
                 args.accumulation_steps, \

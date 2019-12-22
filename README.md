@@ -18,3 +18,9 @@ Please check codes for Dataset in "dataset" folder, you could run tests for (spl
 ```bash
 python3 dataset.py
 ```
+
+## Codes for Training
+Please check codes for Training, you should change the path first then run:
+```bash
+python3 training-k-fold.py
+```
