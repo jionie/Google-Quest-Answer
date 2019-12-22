@@ -46,12 +46,12 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--optimizer', type=str, default='Adam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmRestart', required=False, help="specify the lr scheduler")
-parser.add_argument("--lr", type=int, default=1e-4, required=False, help="specify the initial learning rate for training")
+parser.add_argument("--lr", type=int, default=1e-3, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
 parser.add_argument("--num_epoch", type=int, default=30, required=False, help="specify the total epoch")
 parser.add_argument("--accumulation_steps", type=int, default=4, required=False, help="specify the accumulation steps")
-parser.add_argument('--num_workers', type=int, default=0, \
+parser.add_argument('--num_workers', type=int, default=2, \
     required=False, help='specify the num_workers for testing dataloader')
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
 parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model", \
@@ -197,9 +197,9 @@ def training(fold,
     log.write('   batch_size=%d,  accumulation_steps=%d\n'%(batch_size, accumulation_steps))
     log.write('   experiment  = %s\n' % str(__file__.split('/')[-2:]))
     
-    valid_loss = np.zeros(2, np.float32)
-    train_loss = np.zeros(2, np.float32)
-    valid_metric_optimal = -np.inf
+    valid_loss = np.zeros(1, np.float32)
+    train_loss = np.zeros(1, np.float32)
+    valid_metric_optimal = np.inf
     
     # define tensorboard writer and timer
     writer = SummaryWriter()
@@ -210,6 +210,12 @@ def training(fold,
     # criterion = FocalLoss()
     
     for epoch in range(1, num_epoch+1):
+
+        # init in-epoch statistics
+        labels_train = None
+        pred_train   = None
+        labels_val   = None
+        pred_val     = None
         
         # update lr and start from start_epoch  
         # if (not lr_scheduler_each_iter):
@@ -224,18 +230,18 @@ def training(fold,
         #     else:
         #         optimizer.param_groups[0]['lr'] = 5e-6
                 
-        affect_rate = CosineAnnealingWarmUpRestarts(epoch, T_0=num_epoch, T_warmup=15, gamma=0.8,)
+        affect_rate = CosineAnnealingWarmUpRestarts(epoch, T_0=num_epoch, T_warmup=5, gamma=0.8,)
         optimizer.param_groups[0]['lr'] = affect_rate * lr
         
         if epoch < 5:
             optimizer.param_groups[0]['lr'] = affect_rate * lr
         elif epoch < 10:
-            lr = 5e-5
+            lr = 1e-4
             optimizer.param_groups[0]['lr'] = affect_rate * lr
         elif epoch < 20:
-            optimizer.param_groups[0]['lr'] = 1e-5
+            optimizer.param_groups[0]['lr'] = 5e-5
         else:
-            optimizer.param_groups[0]['lr'] = 5e-6 
+            optimizer.param_groups[0]['lr'] = 1e-5 
            
         if (epoch < start_epoch):
             continue
@@ -261,7 +267,7 @@ def training(fold,
             # set input to cuda mode
             token_ids = token_ids.cuda()
             seg_ids   = seg_ids.cuda()
-            labels    = labels.cuda()
+            labels    = labels.cuda().float()
 
             # predict and calculate loss (only need torch.sigmoid when inference)
             prediction = model(token_ids, seg_ids)  
@@ -286,28 +292,35 @@ def training(fold,
                 writer.add_scalar('train_loss_' + str(fold), loss.item(), (epoch-1)*len(train_data_loader)*batch_size+tr_batch_i*batch_size)
             
             # calculate statistics
-            prediction = torch.sigmoid(prediction).cpu().detach().numpy()
-            spearman = Spearman(labels.cpu().detach().numpy(), prediction)
+            prediction = torch.sigmoid(prediction)
+
+            if tr_batch_i == 0:
+                labels_train = labels.cpu().detach().numpy()
+                pred_train   = prediction.cpu().detach().numpy()
+            else:
+                labels_train = np.concatenate((labels_train, labels.cpu().detach().numpy()), axis=0)
+                pred_train   = np.concatenate((pred_train, prediction.cpu().detach().numpy()), axis=0)
             
-            l = np.array([loss.item() * batch_size, spearman])
+            l = np.array([loss.item() * batch_size])
             n = np.array([batch_size])
             sum_train_loss = sum_train_loss + l
             sum_train      = sum_train + n
             
             # log for training
             if (tr_batch_i+1) % log_step == 0:  
-                train_loss = sum_train_loss / (sum_train + 1e-12)
+                train_loss          = sum_train_loss / (sum_train + 1e-12)
                 sum_train_loss[...] = 0
                 sum_train[...]      = 0
+                spearman            = Spearman(labels_train, pred_train)
                 log.write('lr: %f train loss: %f train_spearman: %f\n' % \
-                    (rate, train_loss[0], train_loss[1]))
+                    (rate, train_loss[0], spearman))
             
 
             if (tr_batch_i+1) % eval_step == 0:  
                 
                 eval_count += 1
                 
-                valid_loss = np.zeros(2, np.float32)
+                valid_loss = np.zeros(1, np.float32)
                 valid_num  = np.zeros_like(valid_loss)
                 valid_metric = []
                 
@@ -324,7 +337,7 @@ def training(fold,
                         # set input to cuda mode
                         token_ids = token_ids.cuda()
                         seg_ids   = seg_ids.cuda()
-                        labels    = labels.cuda()
+                        labels    = labels.cuda().float()
 
                         # predict and calculate loss (only need torch.sigmoid when inference)
                         prediction = model(token_ids, seg_ids)  
@@ -333,22 +346,29 @@ def training(fold,
                         writer.add_scalar('val_loss_' + str(fold), loss.item(), (eval_count-1)*len(val_data_loader)*valid_batch_size+val_batch_i*valid_batch_size)
                         
                         # calculate statistics
-                        prediction = torch.sigmoid(prediction).cpu().detach().numpy()
-                        spearman = Spearman(labels.cpu().detach().numpy(), prediction)
+                        prediction = torch.sigmoid(prediction)
 
-                        l = np.array([loss.item()*valid_batch_size, spearman])
+                        if val_batch_i == 0:
+                            labels_val = labels.cpu().detach().numpy()
+                            pred_val   = prediction.cpu().detach().numpy()
+                        else:
+                            labels_val = np.concatenate((labels_val, labels.cpu().detach().numpy()), axis=0)
+                            pred_val   = np.concatenate((pred_val, prediction.cpu().detach().numpy()), axis=0)
+
+                        l = np.array([loss.item()*valid_batch_size])
                         n = np.array([valid_batch_size])
                         valid_loss = valid_loss + l
                         valid_num  = valid_num + n
                         
                     valid_loss = valid_loss / valid_num
-                    
+                    spearman   = Spearman(labels_val, pred_val)
+
                     log.write('validation loss: %f val_spearman: %f\n' % \
-                    (valid_loss[0], valid_loss[1]))
+                    (valid_loss[0], spearman))
 
-        val_metric_epoch = valid_loss[1]
+        val_metric_epoch = valid_loss[0]
 
-        if (val_metric_epoch >= valid_metric_optimal):
+        if (val_metric_epoch <= valid_metric_optimal):
             
             log.write('Validation metric improved ({:.6f} --> {:.6f}).  Saving model ...'.format(\
                     valid_metric_optimal, val_metric_epoch))
