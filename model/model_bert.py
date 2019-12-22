@@ -23,7 +23,6 @@ class QuestNet(nn.Module):
 
         # use sequence_out + global_average_pooling
         out = torch.squeeze(torch.mean(sequence_out, dim=1))
-        print(out.shape)
         # out N * 768
         out = F.dropout(out, p=0.2, training=self.training)
         logit = self.fc(out)
