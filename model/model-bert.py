@@ -5,10 +5,10 @@ import torch.nn.functional as F
 
 ############################################ Define Net Class
 class QuestNet(nn.Module):
-    def __init__(self, n_classes=30):
+    def __init__(self, model_type="bert-base-uncased", n_classes=30):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
-        self.bert_model = BertModel.from_pretrained('bert-base-uncased')    
+        self.bert_model = BertModel.from_pretrained(model_type)    
         self.fc = nn.Linear(768, n_classes)
 
 
