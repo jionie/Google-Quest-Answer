@@ -9,7 +9,7 @@ class QuestNet(nn.Module):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
         self.bert_model = BertModel.from_pretrained(model_type)    
-        self.fc = nn.Linear(768, n_classes)
+        self.fc = nn.Linear(768 * 2, n_classes)
 
 
     def forward(self, ids, seg_ids):
@@ -22,8 +22,14 @@ class QuestNet(nn.Module):
         # out = F.dropout(pooled_out, p=0.2, training=self.training)
 
         # use sequence_out + global_average_pooling
-        out = torch.squeeze(torch.mean(sequence_out, dim=1))
-        # out N * 768
+        # out = torch.squeeze(torch.mean(sequence_out, dim=1))
+
+        # use sequence_out + global_average_pooling cat sequence_out + global_max_pooling
+        out_mean = torch.squeeze(torch.mean(sequence_out, dim=1))
+        out_max, _ = torch.max(sequence_out, dim=1)
+        out = torch.cat([out_mean, out_max], dim=1)
+        # out N * 768 * 2
+        
         out = F.dropout(out, p=0.2, training=self.training)
         logit = self.fc(out)
 

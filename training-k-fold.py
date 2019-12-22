@@ -46,10 +46,10 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--optimizer', type=str, default='Adam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmRestart', required=False, help="specify the lr scheduler")
-parser.add_argument("--lr", type=int, default=2e-3, required=False, help="specify the initial learning rate for training")
+parser.add_argument("--lr", type=int, default=1e-4, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
-parser.add_argument("--valid_batch_size", type=int, default=8, required=False, help="specify the batch size for validating")
-parser.add_argument("--num_epoch", type=int, default=100, required=False, help="specify the total epoch")
+parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
+parser.add_argument("--num_epoch", type=int, default=30, required=False, help="specify the total epoch")
 parser.add_argument("--accumulation_steps", type=int, default=4, required=False, help="specify the accumulation steps")
 parser.add_argument('--num_workers', type=int, default=0, \
     required=False, help='specify the num_workers for testing dataloader')
@@ -189,7 +189,7 @@ def training(fold,
 
     ############################################################################### eval setting
     eval_step = len(train_data_loader) # or len(train_data_loader) 
-    log_step = 1000
+    log_step = 50
     eval_count = 0
 
     ############################################################################### training
@@ -227,12 +227,12 @@ def training(fold,
         affect_rate = CosineAnnealingWarmUpRestarts(epoch, T_0=num_epoch, T_warmup=15, gamma=0.8,)
         optimizer.param_groups[0]['lr'] = affect_rate * lr
         
-        if epoch < 25:
+        if epoch < 5:
             optimizer.param_groups[0]['lr'] = affect_rate * lr
-        elif epoch < 50:
-            lr = 2e-4
+        elif epoch < 10:
+            lr = 5e-5
             optimizer.param_groups[0]['lr'] = affect_rate * lr
-        elif epoch < 75:
+        elif epoch < 20:
             optimizer.param_groups[0]['lr'] = 1e-5
         else:
             optimizer.param_groups[0]['lr'] = 5e-6 

@@ -5,6 +5,10 @@ from scipy.stats import spearmanr, rankdata
 
 def Spearman(y_val, y_pred):
 
-    spearman = [ spearmanr(np.squeeze(y_val[:, ind]) + 1e-8, np.squeeze(y_pred[:, ind]) + 1e-8).correlation for ind in range(y_pred.shape[1]) ]
+    spearman = []
 
+    for ind in range(y_pred.shape[1]):
+        tmp_spearman, _ = spearmanr(y_val[:, ind] + np.random.normal(0, 1e-7, y_val.shape[0]), y_pred[:, ind] + np.random.normal(0, 1e-7, y_pred.shape[0]))
+        spearman.append(tmp_spearman)
+    
     return np.mean(spearman)
