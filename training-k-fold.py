@@ -3,6 +3,7 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 
 # import common libraries
+import gc
 import random
 import argparse
 import pandas as pd
@@ -46,10 +47,10 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--optimizer', type=str, default='Ranger', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='CosineAnealing', required=False, help="specify the lr scheduler")
-parser.add_argument("--lr", type=int, default=1e-3, required=False, help="specify the initial learning rate for training")
+parser.add_argument("--lr", type=int, default=1e-4, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
-parser.add_argument("--num_epoch", type=int, default=30, required=False, help="specify the total epoch")
+parser.add_argument("--num_epoch", type=int, default=15, required=False, help="specify the total epoch")
 parser.add_argument("--accumulation_steps", type=int, default=4, required=False, help="specify the accumulation steps")
 parser.add_argument('--num_workers', type=int, default=2, \
     required=False, help='specify the num_workers for testing dataloader')
@@ -97,6 +98,8 @@ def training(fold,
             load_pretrain
             ):
     
+    torch.cuda.empty_cache()
+
     COMMON_STRING ='@%s:  \n' % os.path.basename(__file__)
     COMMON_STRING += '\tset random seed\n'
     COMMON_STRING += '\t\tSEED = %d\n'%SEED
@@ -171,7 +174,7 @@ def training(fold,
     
     ############################################################################### lr_scheduler
     if lr_scheduler_name == "CosineAnealing":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, num_epoch, eta_min=0, last_epoch=-1)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 10, eta_min=1e-5, last_epoch=-1)
         lr_scheduler_each_iter = False
     elif lr_scheduler_name == "WarmRestart":
         scheduler = WarmRestart(optimizer, T_max=5, T_mult=1, eta_min=1e-6)
@@ -219,16 +222,21 @@ def training(fold,
         
         # update lr and start from start_epoch  
         if (not lr_scheduler_each_iter):
-            if epoch < 6:
+            if epoch < 8:
                 if epoch != 1:
                     scheduler.step()
-                    # scheduler = warm_restart(scheduler, T_mult=2) 
-            elif epoch < 11:
-                optimizer.param_groups[0]['lr'] = 1e-4
-            elif epoch < 21:
-                optimizer.param_groups[0]['lr'] = 1e-5
             else:
-                optimizer.param_groups[0]['lr'] = 5e-6
+                optimizer.param_groups[0]['lr'] = 1e-5
+
+        # if (not lr_scheduler_each_iter):
+        #     if epoch < 11:
+        #         if epoch != 1:
+        #             scheduler.step()
+        #             # scheduler = warm_restart(scheduler, T_mult=2) 
+        #     elif epoch < 21:
+        #         optimizer.param_groups[0]['lr'] = 1e-4
+        #     else:
+        #         optimizer.param_groups[0]['lr'] = 1e-5
                 
         # affect_rate = CosineAnnealingWarmUpRestarts(epoch, T_0=num_epoch, T_warmup=5, gamma=0.8,)
         # optimizer.param_groups[0]['lr'] = affect_rate * lr
@@ -391,6 +399,11 @@ if __name__ == "__main__":
     # k-fold training
     for fold in range(N_SPLITS):
 
+        torch.cuda.empty_cache()
+
+        if fold < 4:
+            continue
+
         # get train_data_loader and val_data_loader
         train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, SEED)
         val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, SEED)
@@ -421,3 +434,5 @@ if __name__ == "__main__":
                 args.accumulation_steps, \
                 args.checkpoint_folder, \
                 args.load_pretrain)
+
+        gc.collect()
