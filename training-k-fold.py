@@ -47,7 +47,7 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--optimizer', type=str, default='Ranger', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='CosineAnealing', required=False, help="specify the lr scheduler")
-parser.add_argument("--lr", type=int, default=1e-4, required=False, help="specify the initial learning rate for training")
+parser.add_argument("--lr", type=float, default=1e-4, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
 parser.add_argument("--num_epoch", type=int, default=15, required=False, help="specify the total epoch")
@@ -58,26 +58,25 @@ parser.add_argument("--start_epoch", type=int, default=0, required=False, help="
 parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model", \
     required=False, help="specify the folder for checkpoint")
 parser.add_argument('--load_pretrain', action='store_true', default=False, help='whether to load pretrain model')
+parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
+parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
+parser.add_argument('--n_splits', type=int, default=5, required=True, help="specify the n_splits for training")
 
 
 ############################################################################## Define Constant
-SEED = 42
-N_SPLITS = 5
 NUM_CLASS = 30
 
 
-############################################################################## Seed All
-def seed_everything(seed=SEED):
+############################################################################## seed All
+def seed_everything(seed=42):
     random.seed(seed)
-    os.environ['PYHTONHASHSEED'] = str(seed)
+    os.environ['PYHTONHASHseed'] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.benchmark     = False  ##uses the inbuilt cudnn auto-tuner to find the fastest convolution algorithms. -
     torch.backends.cudnn.enabled       = True
     torch.backends.cudnn.deterministic = True
-
-seed_everything(SEED)
 
 
 ############################################################################## define function for training
@@ -95,14 +94,15 @@ def training(fold,
             start_epoch,
             accumulation_steps,
             checkpoint_folder,
-            load_pretrain
+            load_pretrain,
+            seed
             ):
     
     torch.cuda.empty_cache()
 
     COMMON_STRING ='@%s:  \n' % os.path.basename(__file__)
     COMMON_STRING += '\tset random seed\n'
-    COMMON_STRING += '\t\tSEED = %d\n'%SEED
+    COMMON_STRING += '\t\tseed = %d\n'%seed
 
     COMMON_STRING += '\tset cuda environment\n'
     COMMON_STRING += '\t\ttorch.__version__              = %s\n'%torch.__version__
@@ -125,7 +125,7 @@ def training(fold,
     log.write('\t%s\n' % COMMON_STRING)
     log.write('\n')
 
-    log.write('\tSEED         = %u\n' % SEED)
+    log.write('\tseed         = %u\n' % seed)
     log.write('\tFOLD         = %s\n' % fold)
     log.write('\t__file__     = %s\n' % __file__)
     log.write('\tout_dir      = %s\n' % checkpoint_folder)
@@ -389,50 +389,45 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    seed_everything(args.seed)
+
     # get train val split
     data_path = args.train_data_folder + "train.csv"
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
-                        n_splits=N_SPLITS, \
-                        seed=SEED)
-    
-    # k-fold training
-    for fold in range(N_SPLITS):
+                        n_splits=args.n_splits, \
+                        seed=args.seed)
 
-        torch.cuda.empty_cache()
+    # get train_data_loader and val_data_loader
+    train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(args.fold, args.seed)
+    val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(args.fold, args.seed)
 
-        if fold < 4:
-            continue
+    if args.model_type == "bert":
+        train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+                                                    val_data_path=val_data_path, \
+                                                    model_type=args.model_name, \
+                                                    batch_size=args.batch_size, \
+                                                    val_batch_size=args.valid_batch_size, \
+                                                    num_workers=args.num_workers)
+    else:
+        raise NotImplementedError
 
-        # get train_data_loader and val_data_loader
-        train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, SEED)
-        val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, SEED)
+    # start training
+    training(args.fold, \
+            train_data_loader, \
+            val_data_loader, \
+            args.model_type, \
+            args.model_name, \
+            args.optimizer, \
+            args.lr_scheduler, \
+            args.lr, \
+            args.batch_size, \
+            args.valid_batch_size, \
+            args.num_epoch, \
+            args.start_epoch, \
+            args.accumulation_steps, \
+            args.checkpoint_folder, \
+            args.load_pretrain, \
+            args.seed)
 
-        if args.model_type == "bert":
-            train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
-                                                        val_data_path=val_data_path, \
-                                                        model_type=args.model_name, \
-                                                        batch_size=args.batch_size, \
-                                                        val_batch_size=args.valid_batch_size, \
-                                                        num_workers=args.num_workers)
-        else:
-            raise NotImplementedError
-
-        # start training
-        training(fold, \
-                train_data_loader, \
-                val_data_loader, \
-                args.model_type, \
-                args.model_name, \
-                args.optimizer, \
-                args.lr_scheduler, \
-                args.lr, \
-                args.batch_size, \
-                args.valid_batch_size, \
-                args.num_epoch, \
-                args.start_epoch, \
-                args.accumulation_steps, \
-                args.checkpoint_folder, \
-                args.load_pretrain)
-
-        gc.collect()
+    gc.collect()
