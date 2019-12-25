@@ -236,7 +236,7 @@ def training(
     
     valid_loss = np.zeros(1, np.float32)
     train_loss = np.zeros(1, np.float32)
-    valid_metric_optimal = np.inf
+    valid_metric_optimal = -np.inf
     
     # define tensorboard writer and timer
     writer = SummaryWriter()
