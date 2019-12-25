@@ -1,5 +1,0 @@
-python3 training-k-fold.py --model_name "bert-large-uncased" --fold 0 --seed 323 --n_splits 5 --batch_size 2 --valid_batch_size 8 --accumulation_steps 4 --lr 0.0001
-# python3 training-k-fold.py --model_name "bert-large-uncased" --fold 1 --seed 323 --n_splits 5 --batch_size 2 --valid_batch_size 8 --accumulation_steps 4 --lr 0.0001
-# python3 training-k-fold.py --model_name "bert-large-uncased" --fold 2 --seed 323 --n_splits 5 --batch_size 2 --valid_batch_size 8 --accumulation_steps 4 --lr 0.0001
-# python3 training-k-fold.py --model_name "bert-large-uncased" --fold 3 --seed 323 --n_splits 5 --batch_size 2 --valid_batch_size 8 --accumulation_steps 4 --lr 0.0001
-# python3 training-k-fold.py --model_name "bert-large-uncased" --fold 4 --seed 323 --n_splits 5 --batch_size 2 --valid_batch_size 8 --accumulation_steps 4 --lr 0.0001
