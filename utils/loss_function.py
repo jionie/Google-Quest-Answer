@@ -4,6 +4,41 @@ import torch.nn as nn
 import numpy as np
 import torch
 
+class MSELoss(nn.Module):
+    def __init__(self, gamma=2):
+        super().__init__()
+        self.gamma = gamma
+        self.MSELoss = nn.MSELoss()
+
+    def forward(self, logit, target):
+        target = target.float()
+
+        loss = self.MSELoss(torch.sigmoid(logit), target)
+
+        logpt = F.log_softmax(loss, dim=0)
+
+        invprobs = torch.exp(logpt)
+
+        loss = (invprobs ** self.gamma) * loss
+        if len(loss.size())==2:
+            loss = loss.sum(dim=1)
+
+        return loss.mean()
+
+class MSEBCELoss(nn.Module):
+    def __init__(self, gamma=2):
+        super().__init__()
+        self.gamma = gamma
+        self.MSELoss = MSELoss()
+        self.NNMSELoss = nn.MSELoss()
+        self.BCELoss = nn.BCEWithLogitsLoss()
+
+    def forward(self, logit, target):
+        target = target.float()
+        loss = self.NNMSELoss(logit, target) * 10 + self.BCELoss(logit, target)
+
+        return loss.mean()
+
 class SoftDiceLoss_binary(nn.Module):
     def __init__(self):
         super(SoftDiceLoss_binary, self).__init__()

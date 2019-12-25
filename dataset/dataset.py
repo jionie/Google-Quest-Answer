@@ -9,6 +9,9 @@ from sklearn.utils import shuffle
 import random
 from math import floor, ceil
 from sklearn.model_selection import GroupKFold
+import nlpaug.augmenter.word as naw
+import nlpaug.augmenter.sentence as nas
+import nlpaug.augmenter.char as nac
 
 
 ############################################ Define augments for test
@@ -78,11 +81,13 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
 ############################################ Define Dataset 
 
 class QuestDataset(torch.utils.data.Dataset):
-    def __init__(self, df, model_type="bert-base-uncased", train_mode=True, labeled=True):
+    def __init__(self, df, model_type="bert-base-uncased", train_mode=True, labeled=True, augment=True):
         self.df = df
+        self.model_type = model_type
         self.train_mode = train_mode
         self.labeled = labeled
         self.tokenizer = BertTokenizer.from_pretrained(model_type)
+        self.augment = augment
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
@@ -96,6 +101,34 @@ class QuestDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.df)
 
+    def augmentation(self, text, insert=False, substitute=False, swap=True, delete=True):
+        if insert:
+            # aug = naw.ContextualWordEmbsAug(
+            #     model_path=self.model_type, action="insert", device='cuda')
+            aug = naw.WordEmbsAug(
+                model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
+                action="insert")
+            text = aug.augment(text)
+        
+        if substitute:
+            # aug = naw.ContextualWordEmbsAug(
+            #     model_path=self.model_type, action="substitute", device='cuda')
+            # aug = naw.WordEmbsAug(
+            #     model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
+            #     action="substitute")
+            aug = naw.SynonymAug(aug_src='wordnet')
+            text = aug.augment(text)
+
+        if swap:
+            aug = naw.RandomWordAug(action="swap")
+            text = aug.augment(text)
+
+        if delete:
+            aug = naw.RandomWordAug()
+            text = aug.augment(text)
+
+        return text
+
     def select_tokens(self, tokens, max_num):
         if len(tokens) <= max_num:
             return tokens
@@ -108,6 +141,12 @@ class QuestDataset(torch.utils.data.Dataset):
 
     def trim_input(self, title, question, answer, max_sequence_length=MAX_LEN, 
                 t_max_len=30, q_max_len=239, a_max_len=239):
+
+        if self.augment:
+            title = self.augmentation(title, insert=False, substitute=True, swap=True, delete=True)
+            question = self.augmentation(question, insert=False, substitute=True, swap=True, delete=True)
+            answer = self.augmentation(answer, insert=False, substitute=True, swap=True, delete=True)
+
         t = self.tokenizer.tokenize(title)
         q = self.tokenizer.tokenize(question)
         a = self.tokenizer.tokenize(answer)
@@ -140,9 +179,33 @@ class QuestDataset(torch.utils.data.Dataset):
                 raise ValueError("New sequence length should be %d, but is %d" 
                                  % (max_sequence_length, (t_new_len+a_new_len+q_new_len+4)))
 
-            t = t[:t_new_len]
-            q = q[:q_new_len]
-            a = a[:a_new_len]
+            # random select
+            if self.augment:
+                
+                if len(t) - t_new_len > 0:
+                    t_start = np.random.randint(0, len(t) - t_new_len)
+                else:
+                    t_start = 0
+
+                if len(q) - q_new_len > 0:
+                    q_start = np.random.randint(0, len(q) - q_new_len)
+                else:
+                    q_start = 0
+
+                if len(a) - a_new_len > 0:
+                    a_start = np.random.randint(0, len(a) - a_new_len)
+                else:
+                    a_start = 0
+
+                t = t[t_start : (t_start + t_new_len)]
+                q = q[q_start : (q_start + q_new_len)]
+                a = a[a_start : (a_start + a_new_len)]
+
+            else:
+
+                t = t[:t_new_len]
+                q = q[:q_new_len]
+                a = a[:a_new_len]
 
         return t, q, a
         
@@ -187,9 +250,10 @@ class QuestDataset(torch.utils.data.Dataset):
         else:
             return token_ids, seg_ids
 
+
 def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", model_type="bert-base-uncased", batch_size=4):
     df = pd.read_csv(data_path)
-    ds_test = QuestDataset(df, model_type, train_mode=False, labeled=False)
+    ds_test = QuestDataset(df, model_type, train_mode=False, labeled=False, augment=False)
     loader = torch.utils.data.DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=ds_test.collate_fn, drop_last=False)
     loader.num = len(df)
     
@@ -222,7 +286,8 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
                         model_type="bert-base-uncased", \
                         batch_size=4, \
                         val_batch_size=4, \
-                        num_workers=2):
+                        num_workers=2, \
+                        augment=True):
 
     
     df_train = pd.read_csv(train_data_path)
@@ -231,11 +296,11 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
     print(df_train.shape)
     print(df_val.shape)
 
-    ds_train = QuestDataset(df_train, model_type, train_mode=True, labeled=True)
+    ds_train = QuestDataset(df_train, model_type, train_mode=True, labeled=True, augment=augment)
     train_loader = torch.utils.data.DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=ds_train.collate_fn, drop_last=True)
     train_loader.num = len(df_train)
 
-    ds_val = QuestDataset(df_val, model_type, train_mode=False)
+    ds_val = QuestDataset(df_val, model_type, train_mode=False, labeled=True, augment=False)
     val_loader = torch.utils.data.DataLoader(ds_val, batch_size=val_batch_size, shuffle=False, num_workers=num_workers, collate_fn=ds_val.collate_fn, drop_last=False)
     val_loader.num = len(df_val)
     val_loader.df = df_val

@@ -19,6 +19,7 @@ from torch.utils.data import TensorDataset, DataLoader,Dataset
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR, _LRScheduler
 from torch.utils.tensorboard import SummaryWriter
+from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
 
 # import apex for mix precision training
 from apex import amp
@@ -45,12 +46,14 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--optimizer', type=str, default='Ranger', required=False, help='specify the optimizer')
-parser.add_argument("--lr_scheduler", type=str, default='CosineAnealing', required=False, help="specify the lr scheduler")
-parser.add_argument("--lr", type=float, default=1e-4, required=False, help="specify the initial learning rate for training")
+parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
+parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
+parser.add_argument("--warmup_proportion",  type=float, default=0.1, required=False, \
+    help="Proportion of training to perform linear learning rate warmup for. " "E.g., 0.1 = 10%% of training.")
+parser.add_argument("--lr", type=float, default=3e-5, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
-parser.add_argument("--num_epoch", type=int, default=15, required=False, help="specify the total epoch")
+parser.add_argument("--num_epoch", type=int, default=12, required=False, help="specify the total epoch")
 parser.add_argument("--accumulation_steps", type=int, default=4, required=False, help="specify the accumulation steps")
 parser.add_argument('--num_workers', type=int, default=2, \
     required=False, help='specify the num_workers for testing dataloader')
@@ -61,6 +64,8 @@ parser.add_argument('--load_pretrain', action='store_true', default=False, help=
 parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
 parser.add_argument('--n_splits', type=int, default=5, required=True, help="specify the n_splits for training")
+parser.add_argument('--loss', type=str, default="mse", required=True, help="specify the loss for training")
+parser.add_argument('--augment', action='store_true', help="specify whether augmentation for training")
 
 
 ############################################################################## Define Constant
@@ -80,7 +85,9 @@ def seed_everything(seed=42):
 
 
 ############################################################################## define function for training
-def training(fold,
+def training(
+            n_splits,
+            fold,
             train_data_loader, 
             val_data_loader,
             model_type,
@@ -88,6 +95,7 @@ def training(fold,
             optimizer_name,
             lr_scheduler_name,
             lr,
+            warmup_proportion,
             batch_size,
             valid_batch_size,
             num_epoch,
@@ -95,7 +103,9 @@ def training(fold,
             accumulation_steps,
             checkpoint_folder,
             load_pretrain,
-            seed
+            seed,
+            loss,
+            augment
             ):
     
     torch.cuda.empty_cache()
@@ -118,10 +128,20 @@ def training(fold,
     COMMON_STRING += '\t\ttorch.cuda.device_count()      = %d\n'%torch.cuda.device_count()
     COMMON_STRING += '\n'
     
-    os.makedirs(checkpoint_folder + '/' + model_type + '/' + model_name, exist_ok=True)
+    if augment:
+        checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug/')
+    else:
+        checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '/')
+
+    checkpoint_filename = 'fold_' + str(fold) + "_checkpoint.pth"
+    checkpoint_filepath = os.path.join(checkpoint_folder, checkpoint_filename)
+
+    os.makedirs(checkpoint_folder, exist_ok=True)
     
     log = Logger()
-    log.open(checkpoint_folder + '/' + model_type + '/' + model_name + '/' + 'fold_' + str(fold) + '_log_train.txt', mode='a+')
+    log.open(os.path.join(checkpoint_folder, 'fold_' + str(fold) + '_log_train.txt'), mode='a+')
     log.write('\t%s\n' % COMMON_STRING)
     log.write('\n')
 
@@ -146,11 +166,6 @@ def training(fold,
         model.load_state_dict(state_dict)
         
         return model
-    
-
-    ############################################################################### training parameters
-    checkpoint_filename = model_type + '/' + model_name + '/' + 'fold_' + str(fold) + "_checkpoint.pth"
-    checkpoint_filepath = os.path.join(checkpoint_folder, checkpoint_filename)
 
 
     ############################################################################### model
@@ -165,19 +180,38 @@ def training(fold,
         load(model, checkpoint_filepath)
 
     ############################################################################### optimizer
+    param_optimizer = list(model.named_parameters())
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+         'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    ]
+
     if optimizer_name == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+        optimizer = torch.optim.Adam(optimizer_grouped_parameters, lr=lr, weight_decay=1e-5)
     elif optimizer_name == "Ranger":
-        optimizer = Ranger(filter(lambda p: p.requires_grad, model.parameters()), lr, weight_decay=1e-5)
+        optimizer = Ranger(filter(lambda p: p.requires_grad, optimizer_grouped_parameters), lr, weight_decay=1e-5)
+    elif optimizer_name == "BertAdam":
+        num_train_optimization_steps = num_epoch * len(train_data_loader) // accumulation_steps
+        optimizer = BertAdam(optimizer_grouped_parameters,
+                             lr=lr,
+                             warmup=warmup_proportion,
+                             t_total=num_train_optimization_steps)
     else:
         raise NotImplementedError
     
     ############################################################################### lr_scheduler
     if lr_scheduler_name == "CosineAnealing":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 10, eta_min=1e-5, last_epoch=-1)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 12, eta_min=1e-5, last_epoch=-1)
         lr_scheduler_each_iter = False
     elif lr_scheduler_name == "WarmRestart":
         scheduler = WarmRestart(optimizer, T_max=5, T_mult=1, eta_min=1e-6)
+        lr_scheduler_each_iter = False
+    elif lr_scheduler_name == "WarmupLinearSchedule":
+        num_train_optimization_steps = num_epoch * len(train_data_loader) // accumulation_steps
+        scheduler = WarmupLinearSchedule(warmup=warmup_proportion,
+                                        t_total=num_train_optimization_steps)
         lr_scheduler_each_iter = False
     else:
         raise NotImplementedError
@@ -209,8 +243,14 @@ def training(fold,
     start_timer = timer()
     
     # define criterion
-    criterion = nn.BCEWithLogitsLoss()
-    # criterion = FocalLoss()
+    if loss == 'mse':
+        criterion = MSELoss()
+    elif loss == 'bce':
+        criterion = nn.BCEWithLogitsLoss()
+    elif loss == 'mse-bce':
+        criterion = MSEBCELoss()
+    else:
+        raise NotImplementedError
     
     for epoch in range(1, num_epoch+1):
 
@@ -221,35 +261,8 @@ def training(fold,
         pred_val     = None
         
         # update lr and start from start_epoch  
-        if (not lr_scheduler_each_iter):
-            if epoch < 8:
-                if epoch != 1:
-                    scheduler.step()
-            else:
-                optimizer.param_groups[0]['lr'] = 1e-5
-
-        # if (not lr_scheduler_each_iter):
-        #     if epoch < 11:
-        #         if epoch != 1:
-        #             scheduler.step()
-        #             # scheduler = warm_restart(scheduler, T_mult=2) 
-        #     elif epoch < 21:
-        #         optimizer.param_groups[0]['lr'] = 1e-4
-        #     else:
-        #         optimizer.param_groups[0]['lr'] = 1e-5
-                
-        # affect_rate = CosineAnnealingWarmUpRestarts(epoch, T_0=num_epoch, T_warmup=5, gamma=0.8,)
-        # optimizer.param_groups[0]['lr'] = affect_rate * lr
-        
-        # if epoch < 5:
-        #     optimizer.param_groups[0]['lr'] = affect_rate * lr
-        # elif epoch < 10:
-        #     lr = 1e-4
-        #     optimizer.param_groups[0]['lr'] = affect_rate * lr
-        # elif epoch < 20:
-        #     optimizer.param_groups[0]['lr'] = 5e-5
-        # else:
-        #     optimizer.param_groups[0]['lr'] = 1e-5 
+        if ((epoch > 1) and (not lr_scheduler_each_iter) and (optimizer_name != "BertAdam")):
+            scheduler.step()
            
         if (epoch < start_epoch):
             continue
@@ -374,9 +387,9 @@ def training(fold,
                     log.write('validation loss: %f val_spearman: %f\n' % \
                     (valid_loss[0], spearman))
 
-        val_metric_epoch = valid_loss[0]
+        val_metric_epoch = spearman
 
-        if (val_metric_epoch <= valid_metric_optimal):
+        if (val_metric_epoch >= valid_metric_optimal):
             
             log.write('Validation metric improved ({:.6f} --> {:.6f}).  Saving model ...'.format(\
                     valid_metric_optimal, val_metric_epoch))
@@ -386,6 +399,8 @@ def training(fold,
 
 
 if __name__ == "__main__":
+
+    # torch.multiprocessing.set_start_method('spawn')
 
     args = parser.parse_args()
 
@@ -408,12 +423,14 @@ if __name__ == "__main__":
                                                     model_type=args.model_name, \
                                                     batch_size=args.batch_size, \
                                                     val_batch_size=args.valid_batch_size, \
-                                                    num_workers=args.num_workers)
+                                                    num_workers=args.num_workers, \
+                                                    augment=args.augment)
     else:
         raise NotImplementedError
 
     # start training
-    training(args.fold, \
+    training(args.n_splits, \
+            args.fold, \
             train_data_loader, \
             val_data_loader, \
             args.model_type, \
@@ -421,6 +438,7 @@ if __name__ == "__main__":
             args.optimizer, \
             args.lr_scheduler, \
             args.lr, \
+            args.warmup_proportion, \
             args.batch_size, \
             args.valid_batch_size, \
             args.num_epoch, \
@@ -428,6 +446,8 @@ if __name__ == "__main__":
             args.accumulation_steps, \
             args.checkpoint_folder, \
             args.load_pretrain, \
-            args.seed)
+            args.seed, \
+            args.loss, \
+            args.augment)
 
     gc.collect()
