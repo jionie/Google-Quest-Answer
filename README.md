@@ -22,5 +22,5 @@ python3 dataset.py
 ## Codes for Training
 Please check codes for Training, you should change the path first then run:
 ```bash
-python3 training-k-fold.py
+./bert-uncased-k-fold.sh
 ```
