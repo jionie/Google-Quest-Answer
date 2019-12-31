@@ -180,31 +180,47 @@ class QuestDataset(torch.utils.data.Dataset):
                                  % (max_sequence_length, (t_new_len+a_new_len+q_new_len+4)))
 
             # random select
-            if self.augment:
+#             if self.augment:
                 
-                if len(t) - t_new_len > 0:
-                    t_start = np.random.randint(0, len(t) - t_new_len)
-                else:
-                    t_start = 0
+#                 if len(t) - t_new_len > 0:
+#                     t_start = np.random.randint(0, len(t) - t_new_len)
+#                 else:
+#                     t_start = 0
 
-                if len(q) - q_new_len > 0:
-                    q_start = np.random.randint(0, len(q) - q_new_len)
-                else:
-                    q_start = 0
+#                 if len(q) - q_new_len > 0:
+#                     q_start = np.random.randint(0, len(q) - q_new_len)
+#                 else:
+#                     q_start = 0
 
-                if len(a) - a_new_len > 0:
-                    a_start = np.random.randint(0, len(a) - a_new_len)
-                else:
-                    a_start = 0
+#                 if len(a) - a_new_len > 0:
+#                     a_start = np.random.randint(0, len(a) - a_new_len)
+#                 else:
+#                     a_start = 0
 
-                t = t[t_start : (t_start + t_new_len)]
-                q = q[q_start : (q_start + q_new_len)]
-                a = a[a_start : (a_start + a_new_len)]
+#                 t = t[t_start : (t_start + t_new_len)]
+#                 q = q[q_start : (q_start + q_new_len)]
+#                 a = a[a_start : (a_start + a_new_len)]
 
+#             else:
+
+#                 t = t[:t_new_len]
+#                 q = q[:q_new_len]
+#                 a = a[:a_new_len]
+            
+            # truncate
+            if len(t) - t_new_len > 0:
+                t = t[:t_new_len//4] + t[len(t)-t_new_len+t_new_len//4:]
             else:
-
                 t = t[:t_new_len]
+
+            if len(q) - q_new_len > 0:
+                q = q[:q_new_len//4] + q[len(q)-q_new_len+q_new_len//4:]
+            else:
                 q = q[:q_new_len]
+
+            if len(a) - a_new_len > 0:
+                a = a[:a_new_len//4] + a[len(a)-a_new_len+a_new_len//4:]
+            else:
                 a = a[:a_new_len]
 
         return t, q, a
