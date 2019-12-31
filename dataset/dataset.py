@@ -268,7 +268,7 @@ def get_train_val_split(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Ans
     df = pd.read_csv(data_path)
     # shuffle df by seed
     df = shuffle(df, random_state=seed)
-    gkf = GroupKFold(n_splits=5).split(X=df.question_body, groups=df.question_body)
+    gkf = GroupKFold(n_splits=n_splits).split(X=df.question_body, groups=df.question_body)
 
     for fold, (train_idx, valid_idx) in enumerate(gkf):
         
