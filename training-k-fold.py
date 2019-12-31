@@ -180,13 +180,62 @@ def training(
         load(model, checkpoint_filepath)
 
     ############################################################################### optimizer
-    param_optimizer = list(model.named_parameters())
-    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
-         'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    ]
+    if (model_type == "bert") and (model_name == "bert-base-uncased"):
+        
+        optimizer_grouped_parameters = []
+        list_lr = []
+        decay_factor = 0.95
+        
+        list_layers = [model.bert_model.embeddings,
+                  model.bert_model.encoder.layer[0],
+                  model.bert_model.encoder.layer[1],
+                  model.bert_model.encoder.layer[2],
+                  model.bert_model.encoder.layer[3],
+                  model.bert_model.encoder.layer[4],
+                  model.bert_model.encoder.layer[5],
+                  model.bert_model.encoder.layer[6],
+                  model.bert_model.encoder.layer[7],
+                  model.bert_model.encoder.layer[8],
+                  model.bert_model.encoder.layer[9],
+                  model.bert_model.encoder.layer[10],
+                  model.bert_model.encoder.layer[11],
+                  model.bert_model.pooler]
+
+        for i in range(len(list_layers)):
+            list_lr.append(lr)
+            lr = lr * decay_factor
+
+        list_lr.reverse()
+        
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+
+        for i in range(len(list_lr)):
+            
+            layer_parameters = list(list_layers[i].named_parameters())
+            
+            optimizer_grouped_parameters.append({ \
+             'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+             'lr': list_lr[i], \
+             'weight_decay': 0.01})
+
+            optimizer_grouped_parameters.append({ \
+             'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+             'lr': list_lr[i], \
+             'weight_decay': 0.0})
+            
+        print("Differential Learning Rate!!")
+    
+    else:
+        param_optimizer = list(model.named_parameters())
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], \
+             'lr': lr, \
+             'weight_decay': 0.01}, \
+            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], \
+             'lr': lr, \
+             'weight_decay': 0.0}
+        ]
 
     if optimizer_name == "Adam":
         optimizer = torch.optim.Adam(optimizer_grouped_parameters, lr=lr, weight_decay=1e-5)
@@ -195,7 +244,6 @@ def training(
     elif optimizer_name == "BertAdam":
         num_train_optimization_steps = num_epoch * len(train_data_loader) // accumulation_steps
         optimizer = BertAdam(optimizer_grouped_parameters,
-                             lr=lr,
                              warmup=warmup_proportion,
                              t_total=num_train_optimization_steps)
     else:
