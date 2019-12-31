@@ -25,6 +25,9 @@ class QuestNet(nn.Module):
             raise NotImplementedError
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
+        self.dropouts = nn.ModuleList([
+            nn.Dropout(0.5) for _ in range(5)
+        ])
 
     def forward(self, ids, seg_ids):
         attention_mask = (ids > 0)
@@ -44,14 +47,21 @@ class QuestNet(nn.Module):
         # out = torch.cat([out_mean, out_max], dim=1)
         # out N * 768 * 2
 
-        out = F.dropout(out, p=0.2, training=self.training)
-        logit = self.fc(out)
+#         out = F.dropout(out, p=0.2, training=self.training)
+#         logit = self.fc(out)
 
         # out = self.relu(self.fc_1(out))
         # out = F.dropout(out, p=0.2, training=self.training)
         # logit = self.fc_2(out)
 
-        return logit
+#         return logit
+
+        for i, dropout in enumerate(self.dropouts):
+            if i == 0:
+                logit = self.fc(dropout(out))
+            else:
+                logit += self.fc(dropout(out))
+        return logit / len(self.dropouts)
 
 ############################################ Define test Net function
 def test_Net():
