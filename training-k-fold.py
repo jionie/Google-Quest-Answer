@@ -1,6 +1,5 @@
 # import os and define graphic card
 import os
-os.environ["OMP_NUM_THREADS"] = "1"
 
 # import common libraries
 import gc
@@ -18,11 +17,14 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import TensorDataset, DataLoader,Dataset
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR, _LRScheduler
-from torch.utils.tensorboard import SummaryWriter
-from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
+from tensorboardX import SummaryWriter
+from pytorch_pretrained_bert.optimization import BertAdam
+from transformers import get_linear_schedule_with_warmup
 
 # import apex for mix precision training
 from apex import amp
+from apex.parallel import DistributedDataParallel as DDP
+from apex.optimizers import FusedAdam
 
 # import dataset class
 from dataset.dataset import *
@@ -40,15 +42,15 @@ from model.model_bert import *
 
 ############################################################################## Define Argument
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument("--train_data_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/", \
+parser.add_argument("--train_data_folder", type=str, default="/workspace/input/google-quest-challenge/", \
     required=False, help="specify the folder for training data")
 parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
+parser.add_argument('--optimizer', type=str, default='Adam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
-parser.add_argument("--warmup_proportion",  type=float, default=0.1, required=False, \
+parser.add_argument("--warmup_proportion",  type=float, default=0.005, required=False, \
     help="Proportion of training to perform linear learning rate warmup for. " "E.g., 0.1 = 10%% of training.")
 parser.add_argument("--lr", type=float, default=3e-5, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
@@ -58,7 +60,7 @@ parser.add_argument("--accumulation_steps", type=int, default=4, required=False,
 parser.add_argument('--num_workers', type=int, default=2, \
     required=False, help='specify the num_workers for testing dataloader')
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
-parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model", \
+parser.add_argument("--checkpoint_folder", type=str, default="/workspace/model", \
     required=False, help="specify the folder for checkpoint")
 parser.add_argument('--load_pretrain', action='store_true', default=False, help='whether to load pretrain model')
 parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
@@ -70,6 +72,8 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 
 ############################################################################## Define Constant
 NUM_CLASS = 30
+DECAY_FACTOR = 0.95
+MIN_LR = 1e-7
 
 
 ############################################################################## seed All
@@ -130,7 +134,7 @@ def training(
     
     if augment:
         checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
-            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug/')
+            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential/')
     else:
         checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
             optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '/')
@@ -173,7 +177,7 @@ def training(
         model = QuestNet(model_type=model_name, n_classes=NUM_CLASS)
     else:
         raise NotImplementedError
-
+    
     model = model.cuda()
     
     if load_pretrain:
@@ -187,7 +191,6 @@ def training(
         
         optimizer_grouped_parameters = []
         list_lr = []
-        decay_factor = 0.95
         
         if ((model_name == "bert-base-uncased") or (model_name == "bert-base-cased")):
             
@@ -204,7 +207,8 @@ def training(
                       model.bert_model.encoder.layer[9],
                       model.bert_model.encoder.layer[10],
                       model.bert_model.encoder.layer[11],
-                      model.bert_model.pooler]
+                      model.bert_model.pooler,
+                      model.fc]
             
         if (model_name == "bert-large-uncased"):
         
@@ -233,13 +237,19 @@ def training(
                   model.bert_model.encoder.layer[21],
                   model.bert_model.encoder.layer[22],
                   model.bert_model.encoder.layer[23],
-                  model.bert_model.pooler]
+                  model.bert_model.pooler,
+                  model.fc]
 
-        for i in range(len(list_layers)):
-            list_lr.append(lr)
-            lr = lr * decay_factor
+        # for i in range(len(list_layers)):
+        #     list_lr.append(lr)
+        #     lr = lr * DECAY_FACTOR
+#             list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
 
-        list_lr.reverse()
+        # list_lr.reverse()
+        
+        mult = lr / MIN_LR
+        step = mult**(1/(len(list_layers)-1))
+        list_lr = [MIN_LR * (step ** i) for i in range(len(list_layers))]
         
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
 
@@ -272,14 +282,17 @@ def training(
         ]
 
     if optimizer_name == "Adam":
-        optimizer = torch.optim.Adam(optimizer_grouped_parameters, lr=lr, weight_decay=1e-5)
+        optimizer = torch.optim.Adam(optimizer_grouped_parameters)
     elif optimizer_name == "Ranger":
-        optimizer = Ranger(filter(lambda p: p.requires_grad, optimizer_grouped_parameters), lr, weight_decay=1e-5)
+        optimizer = Ranger(optimizer_grouped_parameters)
     elif optimizer_name == "BertAdam":
         num_train_optimization_steps = num_epoch * len(train_data_loader) // accumulation_steps
         optimizer = BertAdam(optimizer_grouped_parameters,
                              warmup=warmup_proportion,
                              t_total=num_train_optimization_steps)
+    elif optimizer_name == "FusedAdam":
+        optimizer = FusedAdam(optimizer_grouped_parameters,
+                              bias_correction=False)
     else:
         raise NotImplementedError
     
@@ -292,9 +305,10 @@ def training(
         lr_scheduler_each_iter = False
     elif lr_scheduler_name == "WarmupLinearSchedule":
         num_train_optimization_steps = num_epoch * len(train_data_loader) // accumulation_steps
-        scheduler = WarmupLinearSchedule(warmup=warmup_proportion,
-                                        t_total=num_train_optimization_steps)
-        lr_scheduler_each_iter = False
+        scheduler = get_linear_schedule_with_warmup(optimizer, \
+                                        num_warmup_steps=int(num_train_optimization_steps*warmup_proportion), \
+                                        num_training_steps=num_train_optimization_steps)
+        lr_scheduler_each_iter = True
     else:
         raise NotImplementedError
 
@@ -305,6 +319,7 @@ def training(
 
     ###############################################################################  mix precision
     model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
+    model = nn.DataParallel(model)
 
     ############################################################################### eval setting
     eval_step = len(train_data_loader) # or len(train_data_loader) 
@@ -322,7 +337,6 @@ def training(
     
     # define tensorboard writer and timer
     writer = SummaryWriter()
-    start_timer = timer()
     
     # define criterion
     if loss == 'mse':
@@ -343,22 +357,20 @@ def training(
         pred_val     = None
         
         # update lr and start from start_epoch  
-        if ((epoch > 1) and (not lr_scheduler_each_iter) and (optimizer_name != "BertAdam")):
+        if ((epoch > 1) and (not lr_scheduler_each_iter)):
             scheduler.step()
-            
+        
         # 1e-4
-        if epoch == 13:
-            for i in range(len(optimizer.param_groups)):
-                optimizer.param_groups[i]['lr'] /= 20
+        # if epoch == 13:
+        #     for i in range(len(optimizer.param_groups)):
+        #         optimizer.param_groups[i]['lr'] /= 20
+        
            
         if (epoch < start_epoch):
             continue
         
         log.write("Epoch%s\n" % epoch)
         log.write('\n')
-            
-        for param_group in optimizer.param_groups:
-            rate = param_group['lr']
 
         sum_train_loss = np.zeros_like(train_loss)
         sum_train = np.zeros_like(train_loss)
@@ -368,6 +380,11 @@ def training(
         optimizer.zero_grad()
         
         for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
+            
+            rate = 0
+            for param_group in optimizer.param_groups:
+                rate += param_group['lr']
+            rate /= len(optimizer.param_groups)
             
             # set model training mode
             model.train() 
@@ -381,10 +398,6 @@ def training(
             prediction = model(token_ids, seg_ids)  
             loss = criterion(prediction, labels)
 
-            # adjust lr
-            if (lr_scheduler_each_iter):
-                scheduler.step(tr_batch_i)
-
             # use apex
             with amp.scale_loss(loss/accumulation_steps, optimizer) as scaled_loss:
                 scaled_loss.backward()
@@ -395,7 +408,10 @@ def training(
             if ((tr_batch_i+1) % accumulation_steps == 0):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0, norm_type=2)
                 optimizer.step()
-                optimizer.zero_grad()
+                model.zero_grad()
+                # adjust lr
+                if (lr_scheduler_each_iter):
+                    scheduler.step()
 
                 writer.add_scalar('train_loss_' + str(fold), loss.item(), (epoch-1)*len(train_data_loader)*batch_size+tr_batch_i*batch_size)
             
