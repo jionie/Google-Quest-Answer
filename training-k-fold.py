@@ -180,13 +180,35 @@ def training(
         load(model, checkpoint_filepath)
 
     ############################################################################### optimizer
-    if (model_type == "bert") and (model_name == "bert-base-uncased"):
+    if (model_type == "bert") and \
+        ((model_name == "bert-base-uncased") \
+         or (model_name == "bert-large-uncased") \
+         or (model_name == "bert-base-cased")):
         
         optimizer_grouped_parameters = []
         list_lr = []
         decay_factor = 0.95
         
-        list_layers = [model.bert_model.embeddings,
+        if ((model_name == "bert-base-uncased") or (model_name == "bert-base-cased")):
+            
+            list_layers = [model.bert_model.embeddings,
+                      model.bert_model.encoder.layer[0],
+                      model.bert_model.encoder.layer[1],
+                      model.bert_model.encoder.layer[2],
+                      model.bert_model.encoder.layer[3],
+                      model.bert_model.encoder.layer[4],
+                      model.bert_model.encoder.layer[5],
+                      model.bert_model.encoder.layer[6],
+                      model.bert_model.encoder.layer[7],
+                      model.bert_model.encoder.layer[8],
+                      model.bert_model.encoder.layer[9],
+                      model.bert_model.encoder.layer[10],
+                      model.bert_model.encoder.layer[11],
+                      model.bert_model.pooler]
+            
+        if (model_name == "bert-large-uncased"):
+        
+            list_layers = [model.bert_model.embeddings,
                   model.bert_model.encoder.layer[0],
                   model.bert_model.encoder.layer[1],
                   model.bert_model.encoder.layer[2],
@@ -199,6 +221,18 @@ def training(
                   model.bert_model.encoder.layer[9],
                   model.bert_model.encoder.layer[10],
                   model.bert_model.encoder.layer[11],
+                  model.bert_model.encoder.layer[12],
+                  model.bert_model.encoder.layer[13],
+                  model.bert_model.encoder.layer[14],
+                  model.bert_model.encoder.layer[15],
+                  model.bert_model.encoder.layer[16],
+                  model.bert_model.encoder.layer[17],
+                  model.bert_model.encoder.layer[18],
+                  model.bert_model.encoder.layer[19],
+                  model.bert_model.encoder.layer[20],
+                  model.bert_model.encoder.layer[21],
+                  model.bert_model.encoder.layer[22],
+                  model.bert_model.encoder.layer[23],
                   model.bert_model.pooler]
 
         for i in range(len(list_layers)):
@@ -312,14 +346,10 @@ def training(
         if ((epoch > 1) and (not lr_scheduler_each_iter) and (optimizer_name != "BertAdam")):
             scheduler.step()
             
-        # 4e-4
-        if epoch == 11:
-            for i in range(len(optimizer.param_groups)):
-                optimizer.param_groups[i]['lr'] /= 4
         # 1e-4
         if epoch == 13:
             for i in range(len(optimizer.param_groups)):
-                optimizer.param_groups[i]['lr'] /= 10
+                optimizer.param_groups[i]['lr'] /= 20
            
         if (epoch < start_epoch):
             continue
