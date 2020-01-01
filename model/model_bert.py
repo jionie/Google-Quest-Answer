@@ -8,7 +8,9 @@ class QuestNet(nn.Module):
     def __init__(self, model_type="bert-base-uncased", n_classes=30):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
-        self.bert_model = BertModel.from_pretrained(model_type)   
+        self.n_classes = n_classes
+        self.bert_model = BertModel.from_pretrained(model_type)  
+        
         if model_type == "bert-base-uncased":
             self.fc = nn.Linear(768 * 1, n_classes)
             # self.fc_1 = nn.Linear(768 * 1, 512)
@@ -61,6 +63,7 @@ class QuestNet(nn.Module):
                 logit = self.fc(dropout(out))
             else:
                 logit += self.fc(dropout(out))
+        logit = torch.reshape(logit, (-1, self.n_classes))
         return logit / len(self.dropouts)
 
 ############################################ Define test Net function
