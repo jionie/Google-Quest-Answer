@@ -12,7 +12,7 @@ def Spearman(y_val, y_pred):
     for ind in range(y_pred.shape[1]):
         tmp_spearman, _ = spearmanr(y_val[:, ind], y_pred[:, ind])
         spearman.append(tmp_spearman)
-    
+    spearman = np.nan_to_num(spearman)
     return np.mean(spearman)
 
 
