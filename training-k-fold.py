@@ -311,6 +311,15 @@ def training(
         # update lr and start from start_epoch  
         if ((epoch > 1) and (not lr_scheduler_each_iter) and (optimizer_name != "BertAdam")):
             scheduler.step()
+            
+        # 4e-4
+        if epoch == 11:
+            for i in range(len(optimizer.param_groups)):
+                optimizer.param_groups[i]['lr'] /= 4
+        # 1e-4
+        if epoch == 13:
+            for i in range(len(optimizer.param_groups)):
+                optimizer.param_groups[i]['lr'] /= 10
            
         if (epoch < start_epoch):
             continue
