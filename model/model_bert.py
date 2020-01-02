@@ -8,9 +8,7 @@ class QuestNet(nn.Module):
     def __init__(self, model_type="bert-base-uncased", n_classes=30):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
-        self.n_classes = n_classes
-        self.bert_model = BertModel.from_pretrained(model_type)  
-        
+        self.bert_model = BertModel.from_pretrained(model_type, output_hidden_states=True, force_download=True)   
         if model_type == "bert-base-uncased":
             self.fc = nn.Linear(768 * 1, n_classes)
             # self.fc_1 = nn.Linear(768 * 1, 512)
@@ -33,37 +31,40 @@ class QuestNet(nn.Module):
 
     def forward(self, ids, seg_ids):
         attention_mask = (ids > 0)
-        sequence_out, pool_out = self.bert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
-        # sequence_out, N * 512 * 768
-        # pooled_out = N * 768
-
-        # use pooled_out
-        # out = F.dropout(pooled_out, p=0.2, training=self.training)
-
+        outputs = self.bert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+        
+        # sequence_output = outputs[0], N * 512 * 768
+        # pooled_output = outputs[1],  N * 768
+        
         # use sequence_out + global_average_pooling
-        out = torch.squeeze(torch.mean(sequence_out, dim=1))
+        # out = torch.squeeze(torch.mean(sequence_out, dim=1))
 
         # use sequence_out + global_average_pooling cat sequence_out + global_max_pooling
         # out_mean = torch.squeeze(torch.mean(sequence_out, dim=1))
         # out_max, _ = torch.max(sequence_out, dim=1)
         # out = torch.cat([out_mean, out_max], dim=1)
-        # out N * 768 * 2
+        
+        # sequence_out = outputs[0]
+        # out = torch.squeeze(torch.mean(sequence_out[:, -4:, :], dim=1))
+        
+        hidden_states = outputs[2]
+        # print(len(hidden_states)) 
+        # 13 (embedding + 11 transformers + pooler) for base, 
+        # 26 (embedding + 24 transformers + pooler) for large, 
+        # we choose last 4 heads not including pooler
+        h1 = hidden_states[-2][:, 0].reshape((-1, 1, 768))
+        h2 = hidden_states[-3][:, 0].reshape((-1, 1, 768))
+        h3 = hidden_states[-4][:, 0].reshape((-1, 1, 768))
+        h4  = hidden_states[-5][:, 0].reshape((-1, 1, 768))
 
-#         out = F.dropout(out, p=0.2, training=self.training)
-#         logit = self.fc(out)
-
-        # out = self.relu(self.fc_1(out))
-        # out = F.dropout(out, p=0.2, training=self.training)
-        # logit = self.fc_2(out)
-
-#         return logit
-
+        all_h = torch.cat([h1, h2, h3, h4], 1)
+        out = torch.mean(all_h, 1)
+        
         for i, dropout in enumerate(self.dropouts):
             if i == 0:
                 logit = self.fc(dropout(out))
             else:
                 logit += self.fc(dropout(out))
-        logit = torch.reshape(logit, (-1, self.n_classes))
         return logit / len(self.dropouts)
 
 ############################################ Define test Net function
