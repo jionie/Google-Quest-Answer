@@ -49,13 +49,13 @@ class QuestNet(nn.Module):
         
         hidden_states = outputs[2]
         # print(len(hidden_states)) 
-        # 13 (embedding + 11 transformers + pooler) for base, 
-        # 26 (embedding + 24 transformers + pooler) for large, 
+        # 13 (embedding + 12 transformers) for base, 
+        # 26 (embedding + 25 transformers) for large, 
         # we choose last 4 heads not including pooler
-        h1 = hidden_states[-2][:, 0].reshape((-1, 1, 768))
-        h2 = hidden_states[-3][:, 0].reshape((-1, 1, 768))
-        h3 = hidden_states[-4][:, 0].reshape((-1, 1, 768))
-        h4  = hidden_states[-5][:, 0].reshape((-1, 1, 768))
+        h1 = hidden_states[-1][:, 0].reshape((-1, 1, 768))
+        h2 = hidden_states[-2][:, 0].reshape((-1, 1, 768))
+        h3 = hidden_states[-3][:, 0].reshape((-1, 1, 768))
+        h4  = hidden_states[-4][:, 0].reshape((-1, 1, 768))
 
         all_h = torch.cat([h1, h2, h3, h4], 1)
         out = torch.mean(all_h, 1)
