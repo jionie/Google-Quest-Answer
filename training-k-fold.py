@@ -73,7 +73,9 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 ############################################################################## Define Constant
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
-MIN_LR = 1e-7
+MIN_LR = 2e-7
+MAX_LR = 2e-5
+UNFREEZE_EPOCH = 3
 
 
 ############################################################################## seed All
@@ -207,8 +209,8 @@ def training(
                       model.bert_model.encoder.layer[9],
                       model.bert_model.encoder.layer[10],
                       model.bert_model.encoder.layer[11],
-                      model.bert_model.pooler,
-                      model.fc]
+                      model.bert_model.pooler
+                      ]
             
         if (model_name == "bert-large-uncased"):
         
@@ -237,34 +239,32 @@ def training(
                   model.bert_model.encoder.layer[21],
                   model.bert_model.encoder.layer[22],
                   model.bert_model.encoder.layer[23],
-                  model.bert_model.pooler,
-                  model.fc]
+                  model.bert_model.pooler
+                  ]
 
-        # for i in range(len(list_layers)):
-        #     list_lr.append(lr)
-        #     lr = lr * DECAY_FACTOR
-#             list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
+#         for i in range(len(list_layers)):
+#             list_lr.append(lr)
+#             lr = lr * DECAY_FACTOR
+# #             list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
 
-        # list_lr.reverse()
+#         list_lr.reverse()
         
-        mult = lr / MIN_LR
+        mult = MAX_LR / MIN_LR
         step = mult**(1/(len(list_layers)-1))
         list_lr = [MIN_LR * (step ** i) for i in range(len(list_layers))]
         
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-
-        for i in range(len(list_lr)):
             
-            layer_parameters = list(list_layers[i].named_parameters())
-            
-            optimizer_grouped_parameters.append({ \
-             'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
-             'lr': list_lr[i], \
+        fc_parameters = list(model.fc.named_parameters())
+        
+        optimizer_grouped_parameters.append({ \
+             'params': [p for n, p in fc_parameters if not any(nd in n for nd in no_decay)], \
+             'lr': lr, \
              'weight_decay': 0.01})
 
-            optimizer_grouped_parameters.append({ \
-             'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
-             'lr': list_lr[i], \
+        optimizer_grouped_parameters.append({ \
+             'params': [p for n, p in fc_parameters if any(nd in n for nd in no_decay)], \
+             'lr': lr, \
              'weight_decay': 0.0})
             
         print("Differential Learning Rate!!")
@@ -360,11 +360,46 @@ def training(
         if ((epoch > 1) and (not lr_scheduler_each_iter)):
             scheduler.step()
         
-        # 1e-4
-        # if epoch == 13:
-        #     for i in range(len(optimizer.param_groups)):
-        #         optimizer.param_groups[i]['lr'] /= 20
-        
+        # unfreeze
+        if epoch == (1 + UNFREEZE_EPOCH):
+            
+            # decrease fc lr
+            for i in range(len(optimizer.param_groups)):
+                optimizer.param_groups[i]['lr'] = 5e-5
+            
+            optimizer_unfreeze_parameters = []
+            
+            for i in range(len(list_lr)):
+   
+                layer_parameters = list(list_layers[i].named_parameters())
+
+                optimizer_unfreeze_parameters.append({ \
+                 'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                 'lr': list_lr[i], \
+                 'weight_decay': 0.01})
+
+                optimizer_unfreeze_parameters.append({ \
+                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                 'lr': list_lr[i], \
+                 'weight_decay': 0.0})
+            
+            for parameter_group in optimizer_unfreeze_parameters:
+                optimizer.add_param_group(parameter_group)
+            
+            if lr_scheduler_name == "CosineAnealing":
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 12, eta_min=1e-5, last_epoch=-1)
+                lr_scheduler_each_iter = False
+            elif lr_scheduler_name == "WarmRestart":
+                scheduler = WarmRestart(optimizer, T_max=5, T_mult=1, eta_min=1e-6)
+                lr_scheduler_each_iter = False
+            elif lr_scheduler_name == "WarmupLinearSchedule":
+                num_train_optimization_steps = (num_epoch - UNFREEZE_EPOCH) * len(train_data_loader) // accumulation_steps
+                scheduler = get_linear_schedule_with_warmup(optimizer, \
+                                                num_warmup_steps=int(num_train_optimization_steps*0.0), \
+                                                num_training_steps=num_train_optimization_steps)
+                lr_scheduler_each_iter = True
+            else:
+                raise NotImplementedError
            
         if (epoch < start_epoch):
             continue
