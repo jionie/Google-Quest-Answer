@@ -73,9 +73,8 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 ############################################################################## Define Constant
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
-MIN_LR = 2e-7
+MIN_LR = 2e-6
 MAX_LR = 2e-5
-UNFREEZE_EPOCH = 3
 
 
 ############################################################################## seed All
@@ -255,7 +254,9 @@ def training(
         
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             
-        fc_parameters = list(model.fc.named_parameters())
+        # fc_parameters = list(model.fc.named_parameters())
+        fc_parameters = list(model.fc_1.named_parameters())
+        fc_parameters.extend(list(model.fc_2.named_parameters()))
         
         optimizer_grouped_parameters.append({ \
              'params': [p for n, p in fc_parameters if not any(nd in n for nd in no_decay)], \
@@ -266,6 +267,24 @@ def training(
              'params': [p for n, p in fc_parameters if any(nd in n for nd in no_decay)], \
              'lr': lr, \
              'weight_decay': 0.0})
+        
+        optimizer_unfreeze_parameters = []
+            
+        for i in range(len(list_lr)):
+
+            layer_parameters = list(list_layers[i].named_parameters())
+
+            optimizer_unfreeze_parameters.append({ \
+                'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                'lr': list_lr[i], \
+                'weight_decay': 0.01})
+
+            optimizer_unfreeze_parameters.append({ \
+                'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                'lr': list_lr[i], \
+                'weight_decay': 0.0}) 
+        
+        optimizer_grouped_parameters.extend(optimizer_unfreeze_parameters)
             
         print("Differential Learning Rate!!")
     
@@ -359,47 +378,6 @@ def training(
         # update lr and start from start_epoch  
         if ((epoch > 1) and (not lr_scheduler_each_iter)):
             scheduler.step()
-        
-        # unfreeze
-        if epoch == (1 + UNFREEZE_EPOCH):
-            
-            # decrease fc lr
-            for i in range(len(optimizer.param_groups)):
-                optimizer.param_groups[i]['lr'] = 5e-5
-            
-            optimizer_unfreeze_parameters = []
-            
-            for i in range(len(list_lr)):
-   
-                layer_parameters = list(list_layers[i].named_parameters())
-
-                optimizer_unfreeze_parameters.append({ \
-                 'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
-                 'lr': list_lr[i], \
-                 'weight_decay': 0.01})
-
-                optimizer_unfreeze_parameters.append({ \
-                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
-                 'lr': list_lr[i], \
-                 'weight_decay': 0.0})
-            
-            for parameter_group in optimizer_unfreeze_parameters:
-                optimizer.add_param_group(parameter_group)
-            
-            if lr_scheduler_name == "CosineAnealing":
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 12, eta_min=1e-5, last_epoch=-1)
-                lr_scheduler_each_iter = False
-            elif lr_scheduler_name == "WarmRestart":
-                scheduler = WarmRestart(optimizer, T_max=5, T_mult=1, eta_min=1e-6)
-                lr_scheduler_each_iter = False
-            elif lr_scheduler_name == "WarmupLinearSchedule":
-                num_train_optimization_steps = (num_epoch - UNFREEZE_EPOCH) * len(train_data_loader) // accumulation_steps
-                scheduler = get_linear_schedule_with_warmup(optimizer, \
-                                                num_warmup_steps=int(num_train_optimization_steps*0.0), \
-                                                num_training_steps=num_train_optimization_steps)
-                lr_scheduler_each_iter = True
-            else:
-                raise NotImplementedError
            
         if (epoch < start_epoch):
             continue
@@ -412,15 +390,14 @@ def training(
 
         # init optimizer
         torch.cuda.empty_cache()
-        optimizer.zero_grad()
+        model.zero_grad()
         
         for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
             
             rate = 0
             for param_group in optimizer.param_groups:
-                rate += param_group['lr']
-            rate /= len(optimizer.param_groups)
-            
+                rate += param_group['lr'] / len(optimizer.param_groups)
+                
             # set model training mode
             model.train() 
 
