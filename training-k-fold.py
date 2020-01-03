@@ -48,9 +48,9 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--optimizer', type=str, default='Adam', required=False, help='specify the optimizer')
+parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
-parser.add_argument("--warmup_proportion",  type=float, default=0.005, required=False, \
+parser.add_argument("--warmup_proportion",  type=float, default=0.1, required=False, \
     help="Proportion of training to perform linear learning rate warmup for. " "E.g., 0.1 = 10%% of training.")
 parser.add_argument("--lr", type=float, default=3e-5, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
@@ -73,8 +73,7 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 ############################################################################## Define Constant
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
-MIN_LR = 2e-6
-MAX_LR = 2e-5
+MIN_LR = 1e-7
 
 
 ############################################################################## seed All
@@ -208,7 +207,8 @@ def training(
                       model.bert_model.encoder.layer[9],
                       model.bert_model.encoder.layer[10],
                       model.bert_model.encoder.layer[11],
-                      model.bert_model.pooler
+                      model.bert_model.pooler,
+                      model.fc
                       ]
             
         if (model_name == "bert-large-uncased"):
@@ -238,53 +238,38 @@ def training(
                   model.bert_model.encoder.layer[21],
                   model.bert_model.encoder.layer[22],
                   model.bert_model.encoder.layer[23],
-                  model.bert_model.pooler
+                  model.bert_model.pooler,
+                  model.fc
                   ]
 
 #         for i in range(len(list_layers)):
 #             list_lr.append(lr)
 #             lr = lr * DECAY_FACTOR
-# #             list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
+#             list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
 
 #         list_lr.reverse()
+#         list_lr[-1] = 0
         
-        mult = MAX_LR / MIN_LR
+        mult = lr / MIN_LR
         step = mult**(1/(len(list_layers)-1))
         list_lr = [MIN_LR * (step ** i) for i in range(len(list_layers))]
         
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             
-        # fc_parameters = list(model.fc.named_parameters())
-        fc_parameters = list(model.fc_1.named_parameters())
-        fc_parameters.extend(list(model.fc_2.named_parameters()))
-        
-        optimizer_grouped_parameters.append({ \
-             'params': [p for n, p in fc_parameters if not any(nd in n for nd in no_decay)], \
-             'lr': lr, \
-             'weight_decay': 0.01})
-
-        optimizer_grouped_parameters.append({ \
-             'params': [p for n, p in fc_parameters if any(nd in n for nd in no_decay)], \
-             'lr': lr, \
-             'weight_decay': 0.0})
-        
-        optimizer_unfreeze_parameters = []
             
         for i in range(len(list_lr)):
 
             layer_parameters = list(list_layers[i].named_parameters())
 
-            optimizer_unfreeze_parameters.append({ \
+            optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
                 'lr': list_lr[i], \
                 'weight_decay': 0.01})
 
-            optimizer_unfreeze_parameters.append({ \
+            optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
                 'lr': list_lr[i], \
                 'weight_decay': 0.0}) 
-        
-        optimizer_grouped_parameters.extend(optimizer_unfreeze_parameters)
             
         print("Differential Learning Rate!!")
     
