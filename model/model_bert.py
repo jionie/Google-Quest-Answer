@@ -25,6 +25,7 @@ class QuestNet(nn.Module):
             raise NotImplementedError
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()
         self.dropouts = nn.ModuleList([
             nn.Dropout(0.5) for _ in range(5)
         ])
@@ -33,11 +34,11 @@ class QuestNet(nn.Module):
         attention_mask = (ids > 0)
         outputs = self.bert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
         
-        # sequence_output = outputs[0], N * 512 * 768
-        # pooled_output = outputs[1],  N * 768
+        sequence_out = outputs[0] # N * 512 * 768
+        # pooled_out = outputs[1] #  N * 768
         
         # use sequence_out + global_average_pooling
-        # out = torch.squeeze(torch.mean(sequence_out, dim=1))
+        avg_out = torch.mean(sequence_out, dim=1, keepdim=True)
 
         # use sequence_out + global_average_pooling cat sequence_out + global_max_pooling
         # out_mean = torch.squeeze(torch.mean(sequence_out, dim=1))
@@ -52,20 +53,34 @@ class QuestNet(nn.Module):
         # 13 (embedding + 12 transformers) for base, 
         # 26 (embedding + 25 transformers) for large, 
         # we choose last 4 heads not including pooler
-        h1 = hidden_states[-1][:, 0].reshape((-1, 1, 768))
-        h2 = hidden_states[-2][:, 0].reshape((-1, 1, 768))
-        h3 = hidden_states[-3][:, 0].reshape((-1, 1, 768))
-        h4  = hidden_states[-4][:, 0].reshape((-1, 1, 768))
+#         h1 = self.tanh(hidden_states[-1][:, 0].reshape((-1, 1, 768)))
+        h2 = torch.mean(hidden_states[-2], dim=1, keepdim=True).reshape((-1, 1, 768))
+        h3 = torch.mean(hidden_states[-3], dim=1, keepdim=True).reshape((-1, 1, 768))
+        h4 = torch.mean(hidden_states[-4], dim=1, keepdim=True).reshape((-1, 1, 768))
 
-        all_h = torch.cat([h1, h2, h3, h4], 1)
-        out = torch.mean(all_h, 1)
+#         avg_h = torch.cat([h2, h3, h4], 1)
+#         out = self.tanh(torch.mean(torch.cat([avg_out, h2, h3, h4], 1), dim=1))
+        out = torch.mean(torch.cat([avg_out, h2, h3, h4], 1), dim=1)
+#         out = torch.squeeze(avg_out)
         
         for i, dropout in enumerate(self.dropouts):
             if i == 0:
                 logit = self.fc(dropout(out))
             else:
                 logit += self.fc(dropout(out))
+                
         return logit / len(self.dropouts)
+        
+        # for i, dropout in enumerate(self.dropouts):
+        #     if i == 0:
+        #         logit = self.fc_1(dropout(out))
+        #     else:
+        #         logit += self.fc_1(dropout(out))
+        
+        # logit /= len(self.dropouts)
+        
+        # return  self.fc_2(self.relu(logit))
+        
 
 ############################################ Define test Net function
 def test_Net():
