@@ -12,20 +12,21 @@ from sklearn.model_selection import GroupKFold
 import nlpaug.augmenter.word as naw
 import nlpaug.augmenter.sentence as nas
 import nlpaug.augmenter.char as nac
+import nlpaug.flow as naf
 
 
 ############################################ Define augments for test
 
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument('-data_path', type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train.csv", \
+parser.add_argument('-data_path', type=str, default="/workspace/input/google-quest-challenge/train_augment.csv", \
     required=False, help='specify the path for train.csv')
-parser.add_argument('-test_data_path', type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
+parser.add_argument('-test_data_path', type=str, default="/workspace/input/google-quest-challenge/test.csv", \
     required=False, help='specify the path for test.csv')
 parser.add_argument('--n_splits', type=int, default=5, \
     required=False, help='specify the number of folds')
 parser.add_argument('--seed', type=int, default=42, \
     required=False, help='specify the random seed for splitting dataset')
-parser.add_argument('--save_path', type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/", \
+parser.add_argument('--save_path', type=str, default="/workspace/input/google-quest-challenge/", \
     required=False, help='specify the path for saving splitted csv')
 parser.add_argument('--test_fold', type=int, default=0, \
     required=False, help='specify the test fold for testing dataloader')
@@ -88,10 +89,11 @@ class QuestDataset(torch.utils.data.Dataset):
         self.labeled = labeled
         self.tokenizer = BertTokenizer.from_pretrained(model_type)
         self.augment = augment
+        self.translation_rate = 0.3
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
-        token_ids, seg_ids = self.get_token_ids(row)
+        token_ids, seg_ids = self.get_token_ids(row, index)
         if self.labeled:
             labels = self.get_label(row)
             return token_ids, seg_ids, labels
@@ -106,7 +108,7 @@ class QuestDataset(torch.utils.data.Dataset):
             # aug = naw.ContextualWordEmbsAug(
             #     model_path=self.model_type, action="insert", device='cuda')
             aug = naw.WordEmbsAug(
-                model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
+                model_type='word2vec', model_path='/workspace/model/word2vec/GoogleNews-vectors-negative300.bin',
                 action="insert")
             text = aug.augment(text)
         
@@ -116,16 +118,21 @@ class QuestDataset(torch.utils.data.Dataset):
             # aug = naw.WordEmbsAug(
             #     model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
             #     action="substitute")
-            aug = naw.SynonymAug(aug_src='wordnet')
-            text = aug.augment(text)
+            aug_sub = naw.SynonymAug(aug_src='wordnet')
+            # text = aug.augment(text)
 
         if swap:
-            aug = naw.RandomWordAug(action="swap")
-            text = aug.augment(text)
+            aug_swap = naw.RandomWordAug(action="swap")
+            # text = aug.augment(text)
 
         if delete:
-            aug = naw.RandomWordAug()
-            text = aug.augment(text)
+            aug_del = naw.RandomWordAug()
+            # text = aug.augment(text)
+            
+        aug = naf.Sometimes([aug_sub, aug_del], aug_p=0.5, pipeline_p=0.5)
+        # print("before aug:", text)
+        text = aug.augment(text, n=1)
+        # print("after aug:", text)
 
         return text
 
@@ -143,8 +150,11 @@ class QuestDataset(torch.utils.data.Dataset):
                 t_max_len=30, q_max_len=239, a_max_len=239):
 
         if self.augment:
+#             print("title: ", title)
             title = self.augmentation(title, insert=False, substitute=True, swap=True, delete=True)
+#             print("question: ", question)
             question = self.augmentation(question, insert=False, substitute=True, swap=True, delete=True)
+#             print("answer: ", answer)
             answer = self.augmentation(answer, insert=False, substitute=True, swap=True, delete=True)
 
         t = self.tokenizer.tokenize(title)
@@ -223,10 +233,37 @@ class QuestDataset(torch.utils.data.Dataset):
             else:
                 a = a[:a_new_len]
 
+#             t = t[:t_new_len]
+#             q = q[:q_new_len]
+#             a = a[:a_new_len]
+                
+#             print(len(t), t_new_len, len(q), q_new_len, len(a), a_new_len)
+
         return t, q, a
         
-    def get_token_ids(self, row):
-        t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer)
+    def get_token_ids(self, row, index):
+        
+        if self.augment:
+            
+            if random.random() < self.translation_rate:
+                title = row.t_aug
+            else:
+                title = row.question_title
+                
+            if random.random() < self.translation_rate:
+                question = row.q_aug
+            else:
+                question = row.question_body
+                
+            if random.random() < self.translation_rate:
+                answer = row.a_aug
+            else:
+                answer = row.answer
+                
+            t_tokens, q_tokens, a_tokens = self.trim_input(title, question, answer)
+            
+        else:
+            t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer)
 
         tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
@@ -267,7 +304,7 @@ class QuestDataset(torch.utils.data.Dataset):
             return token_ids, seg_ids
 
 
-def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", model_type="bert-base-uncased", batch_size=4):
+def get_test_loader(data_path="/workspace/input/google-quest-challenge/test.csv", model_type="bert-base-uncased", batch_size=4):
     df = pd.read_csv(data_path)
     ds_test = QuestDataset(df, model_type, train_mode=False, labeled=False, augment=False)
     loader = torch.utils.data.DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=ds_test.collate_fn, drop_last=False)
@@ -275,13 +312,13 @@ def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/
     
     return loader
 
-def get_train_val_split(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train.csv", \
-                        save_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/", \
+def get_train_val_split(data_path="/workspace/input/google-quest-challenge/train_augment.csv", \
+                        save_path="/workspace/input/google-quest-challenge/", \
                         n_splits=5, \
                         seed=42):
 
     os.makedirs(save_path + '/split', exist_ok=True)
-    df = pd.read_csv(data_path)
+    df = pd.read_csv(data_path, encoding='utf8')
     # shuffle df by seed
     df = shuffle(df, random_state=seed)
     gkf = GroupKFold(n_splits=n_splits).split(X=df.question_body, groups=df.question_body)
@@ -297,8 +334,8 @@ def get_train_val_split(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Ans
     return 
     
 
-def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
-                        val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+def get_train_val_loaders(train_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                        val_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                         model_type="bert-base-uncased", \
                         batch_size=4, \
                         val_batch_size=4, \
@@ -306,8 +343,8 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
                         augment=True):
 
     
-    df_train = pd.read_csv(train_data_path)
-    df_val = pd.read_csv(val_data_path)
+    df_train = pd.read_csv(train_data_path, encoding='utf8')
+    df_val = pd.read_csv(val_data_path, encoding='utf8')
 
     print(df_train.shape)
     print(df_val.shape)
@@ -342,8 +379,8 @@ def test_train_val_split(data_path, \
 
     return
 
-def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
-                     val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+def test_train_loader(train_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                     val_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                      model_type="bert-base-uncased", \
                      batch_size=4, \
                      val_batch_size=4, \
@@ -373,7 +410,7 @@ def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest
         break
 
 
-def test_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
+def test_test_loader(data_path="/workspace/input/google-quest-challenge/test.csv", \
                      model_type="bert-base-uncased", \
                      batch_size=4):
 
