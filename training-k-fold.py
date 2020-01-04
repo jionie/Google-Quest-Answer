@@ -57,7 +57,7 @@ parser.add_argument("--batch_size", type=int, default=8, required=False, help="s
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
 parser.add_argument("--num_epoch", type=int, default=12, required=False, help="specify the total epoch")
 parser.add_argument("--accumulation_steps", type=int, default=4, required=False, help="specify the accumulation steps")
-parser.add_argument('--num_workers', type=int, default=2, \
+parser.add_argument('--num_workers', type=int, default=0, \
     required=False, help='specify the num_workers for testing dataloader')
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
 parser.add_argument("--checkpoint_folder", type=str, default="/workspace/model", \
@@ -507,7 +507,7 @@ if __name__ == "__main__":
     seed_everything(args.seed)
 
     # get train val split
-    data_path = args.train_data_folder + "train.csv"
+    data_path = args.train_data_folder + "train_augment.csv"
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
