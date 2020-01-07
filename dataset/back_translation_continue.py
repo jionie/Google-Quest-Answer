@@ -61,9 +61,9 @@ if __name__=='__main__':
     t = df['question_title'].iloc[now:]
     q = df['question_body'].iloc[now:]
     a = df['answer'].iloc[now:]
-    df['t_aug'].iloc[now:] = t.apply(back_translation)
-    df['q_aug'].iloc[now:] = q.apply(back_translation)
-    df['a_aug'].iloc[now:] = a.apply(back_translation)
+    df.loc[now:,'t_aug'] = t.apply(back_translation)
+    df.loc[now:,'q_aug'] = q.apply(back_translation)
+    df.loc[now:,'a_aug'] = a.apply(back_translation)
     pbar.close()
     df.to_csv('./train_aug.csv', index=False)
     
