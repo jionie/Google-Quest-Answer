@@ -8,21 +8,19 @@ class QuestNet(nn.Module):
     def __init__(self, model_type="bert-base-uncased", n_classes=30):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
-        self.bert_model = BertModel.from_pretrained(model_type, output_hidden_states=True, force_download=True)   
+        self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.2, \
+                                                    output_hidden_states=True, force_download=True)   
         if model_type == "bert-base-uncased":
-            self.fc = nn.Linear(768 * 1, n_classes)
-            # self.fc_1 = nn.Linear(768 * 1, 512)
-            # self.fc_2 = nn.Linear(512, n_classes)
+            self.hidden_size = 768
         elif model_type == "bert-large-uncased":
-            self.fc = nn.Linear(1024 * 1, n_classes)
-            # self.fc_1 = nn.Linear(1024 * 1, 512)
-            # self.fc_2 = nn.Linear(512, n_classes)
+            self.hidden_size = 1024
         elif model_type == "bert-base-cased":
-            self.fc = nn.Linear(768 * 1, n_classes)
-            # self.fc_1 = nn.Linear(768 * 1, 512)
-            # self.fc_2 = nn.Linear(512, n_classes)
+            self.hidden_size = 768
         else:
             raise NotImplementedError
+        
+        self.fc = nn.Linear(self.hidden_size, n_classes)
+        # self.fc_1 = nn.Linear(self.hidden_size, self.hidden_size)
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
@@ -53,14 +51,17 @@ class QuestNet(nn.Module):
         # 13 (embedding + 12 transformers) for base, 
         # 26 (embedding + 25 transformers) for large, 
         # we choose last 4 heads not including pooler
-#         h1 = self.tanh(hidden_states[-1][:, 0].reshape((-1, 1, 768)))
-        h2 = torch.mean(hidden_states[-2], dim=1, keepdim=True).reshape((-1, 1, 768))
-        h3 = torch.mean(hidden_states[-3], dim=1, keepdim=True).reshape((-1, 1, 768))
-        h4 = torch.mean(hidden_states[-4], dim=1, keepdim=True).reshape((-1, 1, 768))
+#         h1 = self.tanh(hidden_states[-1][:, 0].reshape((-1, 1, self.hidden_size)))
+        h2 = torch.mean(hidden_states[-2], dim=1, keepdim=True).reshape((-1, 1, self.hidden_size))
+        h3 = torch.mean(hidden_states[-3], dim=1, keepdim=True).reshape((-1, 1, self.hidden_size))
+        h4 = torch.mean(hidden_states[-4], dim=1, keepdim=True).reshape((-1, 1, self.hidden_size))
 
 #         avg_h = torch.cat([h2, h3, h4], 1)
 #         out = self.tanh(torch.mean(torch.cat([avg_out, h2, h3, h4], 1), dim=1))
         out = torch.mean(torch.cat([avg_out, h2, h3, h4], 1), dim=1)
+#         fc_out = self.fc_1(out)
+#         out = F.gelu(fc_out)
+#         out = self.tanh(fc_out)
 #         out = torch.squeeze(avg_out)
         
         for i, dropout in enumerate(self.dropouts):
