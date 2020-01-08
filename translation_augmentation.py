@@ -22,7 +22,9 @@ def translate(comment, language):
     text = TextBlob(comment)
     try:
         text = text.translate(to=language)
+        time.sleep(1)
         text = text.translate(to="en")
+        time.sleep(1)
     except NotTranslated:
         pass
 
