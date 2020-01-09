@@ -64,7 +64,7 @@ class BertClassificationHead(nn.Module):
 
 ############################################ Define Net Class
 class QuestNet(nn.Module):
-    def __init__(self, model_type="bert-base-uncased", n_classes=30, hidden_layers=[-2, -3, -4]):
+    def __init__(self, model_type="bert-base-uncased", n_classes=30, hidden_layers=[-1, -3, -5, -7, -9]):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
         self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
@@ -72,22 +72,25 @@ class QuestNet(nn.Module):
         self.hidden_layers = hidden_layers
         
         if model_type == "bert-base-uncased":
-            self.hidden_size = 768 * (len(hidden_layers) + 1)
+            self.hidden_size = 768
         elif model_type == "bert-large-uncased":
-            self.hidden_size = 1024 * (len(hidden_layers) + 1)
+            self.hidden_size = 1024
         elif model_type == "bert-base-cased":
-            self.hidden_size = 768 * (len(hidden_layers) + 1)
+            self.hidden_size = 768
         else:
             raise NotImplementedError
         
-#         self.bert_classification_head = BertClassificationHead(self.hidden_size)
+        # self.bert_classification_head = BertClassificationHead(self.hidden_size)
+        # self.fc = nn.Linear(self.hidden_size, n_classes)
         
-        self.fc = nn.Linear(self.hidden_size, n_classes)
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
         self.dropouts = nn.ModuleList([
             nn.Dropout(0.5) for _ in range(5)
+        ])
+        self.fcs = nn.ModuleList([
+            nn.Linear(self.hidden_size, n_classes) for _ in range(len(hidden_layers))
         ])
 
     def forward(self, ids, seg_ids):
@@ -96,29 +99,38 @@ class QuestNet(nn.Module):
         
         # pooled_out = outputs[1] #  N * 768
         
-        sequence_out = torch.unsqueeze(outputs[0][:, 0], dim=-1) # N * 512 * 768 * 1, hidden_states[-1]
+        # sequence_out = torch.unsqueeze(outputs[0][:, 0], dim=-1) # N * 512 * 768 * 1, hidden_states[-1]
+        # fuse_hidden = sequence_out
         
         # 13 (embedding + 12 transformers) for base
         # 26 (embedding + 25 transformers) for large
         hidden_states = outputs[2]
-        fuse_hidden = sequence_out
         
-        for hidden_layer in self.hidden_layers:
-            h = torch.unsqueeze(hidden_states[hidden_layer][:, 0], dim=-1) # N * 768 * 1
-            fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
+        # concat hidden
+        # for hidden_layer in self.hidden_layers:
+        #     h = torch.unsqueeze(hidden_states[hidden_layer][:, 0], dim=-1) # N * 768 * 1
+        #     fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
             
-#         fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
-        
-#         out = self.bert_classification_head(fuse_hidden)
-        out = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+        # fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+        # out = self.bert_classification_head(fuse_hidden)
 
-        for i, dropout in enumerate(self.dropouts):
-            if i == 0:
-                logit = self.fc(dropout(out))
-            else:
-                logit += self.fc(dropout(out))
+        logits = []
+        
+        for i, fc in enumerate(self.fcs):
+            
+            hidden_layer = self.hidden_layers[i]
+            h = hidden_states[hidden_layer][:, 0]
+            
+            for j, dropout in enumerate(self.dropouts):
                 
-        return logit / len(self.dropouts)
+                if j == 0:
+                    logit = fc(dropout(h))
+                else:
+                    logit += fc(dropout(h))
+                    
+            logits.append(logit / len(self.dropouts))
+                
+        return logits
         
         
 
