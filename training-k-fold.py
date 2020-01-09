@@ -416,7 +416,7 @@ def training(
                     else:
                         loss += criterion(prediction, labels)
                     
-                loss /= len(num_loss)
+                loss /= num_loss
             elif epoch < int(num_epoch * 3 / 4):
                 num_loss = int(len(predictions) / 2)
                 for i in range(num_loss):
@@ -426,7 +426,7 @@ def training(
                     else:
                         loss += criterion(prediction, labels)
                     
-                loss /= len(num_loss)   
+                loss /= num_loss  
             else:
                 prediction = predictions[0]
                 loss = criterion(prediction, labels)
@@ -517,7 +517,7 @@ def training(
                                 else:
                                     loss += criterion(prediction, labels)
                                 
-                            loss /= len(num_loss)
+                            loss /= num_loss
                         elif epoch < int(num_epoch * 3 / 4):
                             num_loss = int(len(predictions) / 2)
                             for i in range(num_loss):
@@ -527,7 +527,7 @@ def training(
                                 else:
                                     loss += criterion(prediction, labels)
                                 
-                            loss /= len(num_loss)   
+                            loss /= num_loss
                         else:
                             prediction = predictions[0]
                             loss = criterion(prediction, labels)
