@@ -449,7 +449,7 @@ def training(
                 writer.add_scalar('train_loss_' + str(fold), loss.item(), (epoch-1)*len(train_data_loader)*batch_size+tr_batch_i*batch_size)
             
             # calculate statistics
-            prediction = torch.sigmoid(prediction)
+            prediction = torch.sigmoid(predictions[0])
 
             if tr_batch_i == 0:
                 labels_train = labels.cpu().detach().numpy()
@@ -535,7 +535,7 @@ def training(
                         writer.add_scalar('val_loss_' + str(fold), loss.item(), (eval_count-1)*len(val_data_loader)*valid_batch_size+val_batch_i*valid_batch_size)
                         
                         # calculate statistics
-                        prediction = torch.sigmoid(prediction)
+                        prediction = torch.sigmoid(predictions[0])
 
                         if val_batch_i == 0:
                             labels_val = labels.cpu().detach().numpy()
