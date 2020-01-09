@@ -48,16 +48,18 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
+parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
+    required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
-parser.add_argument("--warmup_proportion",  type=float, default=0.1, required=False, \
+parser.add_argument("--warmup_proportion",  type=float, default=0.05, required=False, \
     help="Proportion of training to perform linear learning rate warmup for. " "E.g., 0.1 = 10%% of training.")
 parser.add_argument("--lr", type=float, default=3e-5, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
 parser.add_argument("--num_epoch", type=int, default=12, required=False, help="specify the total epoch")
 parser.add_argument("--accumulation_steps", type=int, default=4, required=False, help="specify the accumulation steps")
-parser.add_argument('--num_workers', type=int, default=0, \
+parser.add_argument('--num_workers', type=int, default=2, \
     required=False, help='specify the num_workers for testing dataloader')
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
 parser.add_argument("--checkpoint_folder", type=str, default="/workspace/model", \
@@ -96,6 +98,7 @@ def training(
             val_data_loader,
             model_type,
             model_name,
+            hidden_layers, 
             optimizer_name,
             lr_scheduler_name,
             lr,
@@ -134,7 +137,7 @@ def training(
     
     if augment:
         checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
-            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential/')
+            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_test/')
     else:
         checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
             optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '/')
@@ -174,7 +177,7 @@ def training(
 
     ############################################################################### model
     if model_type == "bert":
-        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS)
+        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
     else:
         raise NotImplementedError
     
@@ -207,8 +210,7 @@ def training(
                       model.bert_model.encoder.layer[9],
                       model.bert_model.encoder.layer[10],
                       model.bert_model.encoder.layer[11],
-                      model.bert_model.pooler,
-                      model.fc
+                      model.fcs
                       ]
             
         if (model_name == "bert-large-uncased"):
@@ -238,8 +240,7 @@ def training(
                   model.bert_model.encoder.layer[21],
                   model.bert_model.encoder.layer[22],
                   model.bert_model.encoder.layer[23],
-                  model.bert_model.pooler,
-                  model.fc
+                  model.fcs
                   ]
 
 #         for i in range(len(list_layers)):
@@ -349,6 +350,8 @@ def training(
         criterion = nn.BCEWithLogitsLoss()
     elif loss == 'mse-bce':
         criterion = MSEBCELoss()
+    elif loss == 'focal':
+        criterion = FocalLoss()
     else:
         raise NotImplementedError
     
@@ -392,9 +395,42 @@ def training(
             labels    = labels.cuda().float()
 
             # predict and calculate loss (only need torch.sigmoid when inference)
-            prediction = model(token_ids, seg_ids)  
-            loss = criterion(prediction, labels)
-
+            predictions = model(token_ids, seg_ids)  
+            
+            if epoch < int(num_epoch / 4):
+                num_loss = len(predictions)
+                for i in range(num_loss):
+                    prediction = predictions[i]
+                    if i == 0:
+                        loss = criterion(prediction, labels)
+                    else:
+                        loss += criterion(prediction, labels)
+                    
+                loss /= num_loss
+            elif epoch < int(num_epoch / 2):
+                num_loss = int(len(predictions) * 3 / 4)
+                for i in range(num_loss):
+                    prediction = predictions[i]
+                    if i == 0:
+                        loss = criterion(prediction, labels)
+                    else:
+                        loss += criterion(prediction, labels)
+                    
+                loss /= len(num_loss)
+            elif epoch < int(num_epoch * 3 / 4):
+                num_loss = int(len(predictions) / 2)
+                for i in range(num_loss):
+                    prediction = predictions[i]
+                    if i == 0:
+                        loss = criterion(prediction, labels)
+                    else:
+                        loss += criterion(prediction, labels)
+                    
+                loss /= len(num_loss)   
+            else:
+                prediction = predictions[0]
+                loss = criterion(prediction, labels)
+            
             # use apex
             with amp.scale_loss(loss/accumulation_steps, optimizer) as scaled_loss:
                 scaled_loss.backward()
@@ -443,7 +479,6 @@ def training(
                 
                 valid_loss = np.zeros(1, np.float32)
                 valid_num  = np.zeros_like(valid_loss)
-                valid_metric = []
                 
                 with torch.no_grad():
                     
@@ -461,8 +496,41 @@ def training(
                         labels    = labels.cuda().float()
 
                         # predict and calculate loss (only need torch.sigmoid when inference)
-                        prediction = model(token_ids, seg_ids)  
-                        loss = criterion(prediction, labels)
+                        predictions = model(token_ids, seg_ids)  
+                        
+                        if epoch < int(num_epoch / 4):
+                            num_loss = len(predictions)
+                            for i in range(num_loss):
+                                prediction = predictions[i]
+                                if i == 0:
+                                    loss = criterion(prediction, labels)
+                                else:
+                                    loss += criterion(prediction, labels)
+                                
+                            loss /= num_loss
+                        elif epoch < int(num_epoch / 2):
+                            num_loss = int(len(predictions) * 3 / 4)
+                            for i in range(num_loss):
+                                prediction = predictions[i]
+                                if i == 0:
+                                    loss = criterion(prediction, labels)
+                                else:
+                                    loss += criterion(prediction, labels)
+                                
+                            loss /= len(num_loss)
+                        elif epoch < int(num_epoch * 3 / 4):
+                            num_loss = int(len(predictions) / 2)
+                            for i in range(num_loss):
+                                prediction = predictions[i]
+                                if i == 0:
+                                    loss = criterion(prediction, labels)
+                                else:
+                                    loss += criterion(prediction, labels)
+                                
+                            loss /= len(num_loss)   
+                        else:
+                            prediction = predictions[0]
+                            loss = criterion(prediction, labels)
                             
                         writer.add_scalar('val_loss_' + str(fold), loss.item(), (eval_count-1)*len(val_data_loader)*valid_batch_size+val_batch_i*valid_batch_size)
                         
@@ -507,7 +575,7 @@ if __name__ == "__main__":
     seed_everything(args.seed)
 
     # get train val split
-    data_path = args.train_data_folder + "train_augment.csv"
+    data_path = args.train_data_folder + "train_augment_old.csv"
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
@@ -535,6 +603,7 @@ if __name__ == "__main__":
             val_data_loader, \
             args.model_type, \
             args.model_name, \
+            args.hidden_layers, \
             args.optimizer, \
             args.lr_scheduler, \
             args.lr, \
