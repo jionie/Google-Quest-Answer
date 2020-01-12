@@ -4,84 +4,37 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-############################################ Define SubModel Class
-def gelu(x):
-    """ Original Implementation of the gelu activation function in Google Bert repo when initially created.
-        For information: OpenAI GPT's gelu is slightly different (and gives slightly different results):
-        0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
-        Also see https://arxiv.org/abs/1606.08415
-    """
-    return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
-
-
-def gelu_new(x):
-    """ Implementation of the gelu activation function currently in Google Bert repo (identical to OpenAI GPT).
-        Also see https://arxiv.org/abs/1606.08415
-    """
-    return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
-
-
-def swish(x):
-    return x * torch.sigmoid(x)
-
-
-def mish(x):
-    return x * torch.tanh(nn.functional.softplus(x))
-
-
-ACT2FN = {"gelu": gelu, "relu": torch.nn.functional.relu, "swish": swish, "gelu_new": gelu_new, "mish": mish}
-
-
-BertLayerNorm = torch.nn.LayerNorm
-
-class BertPredictionHeadTransform(nn.Module):
-    def __init__(self, hidden_size, hidden_act="gelu", layer_norm_eps=1e-12):
-        super(BertPredictionHeadTransform, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        if isinstance(hidden_act, str):
-            self.transform_act_fn = ACT2FN[hidden_act]
-        else:
-            self.transform_act_fn = hidden_act
-        self.LayerNorm = BertLayerNorm(hidden_size, eps=layer_norm_eps)
-
-    def forward(self, hidden_states):
-        hidden_states = self.dense(hidden_states)
-        hidden_states = self.transform_act_fn(hidden_states)
-        hidden_states = self.LayerNorm(hidden_states)
-        return hidden_states
-
-
-class BertClassificationHead(nn.Module):
-    def __init__(self, hidden_size, hidden_act="gelu", layer_norm_eps=1e-12):
-        super(BertClassificationHead, self).__init__()
-        self.transform = BertPredictionHeadTransform(hidden_size, hidden_act, layer_norm_eps)
-#         self.decoder = nn.Linear(hidden_size, hidden_size, bias=False)
-
-    def forward(self, hidden_states):
-        hidden_states = self.transform(hidden_states)
-#         hidden_states = self.decoder(hidden_states)
-        return hidden_states
-
 ############################################ Define Net Class
 class QuestNet(nn.Module):
-    def __init__(self, model_type="bert-base-uncased", n_classes=30, hidden_layers=[-1, -3, -5, -7, -9]):
+    def __init__(self, model_type="xlnet-base-cased", n_classes=30, hidden_layers=[-1, -3, -5, -7]):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
-        self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
-                                                    output_hidden_states=True, force_download=True)   
+        self.model_type = model_type
         self.hidden_layers = hidden_layers
         
         if model_type == "bert-base-uncased":
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.2, \
+                                                    output_hidden_states=True, force_download=True)   
             self.hidden_size = 768
         elif model_type == "bert-large-uncased":
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.2, \
+                                                    output_hidden_states=True, force_download=True)   
             self.hidden_size = 1024
         elif model_type == "bert-base-cased":
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.2, \
+                                                    output_hidden_states=True, force_download=True)   
             self.hidden_size = 768
+        elif model_type == "xlnet-base-cased":
+            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.2, output_hidden_states=True)   
+            self.hidden_size = 768
+        elif model_type == "xlnet-large-cased":
+            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.2, output_hidden_states=True)   
+            self.hidden_size = 1024
         else:
             raise NotImplementedError
         
-        # self.bert_classification_head = BertClassificationHead(self.hidden_size)
-        # self.fc = nn.Linear(self.hidden_size, n_classes)
+        self.fc_1 = nn.Linear(self.hidden_size * len(hidden_layers), self.hidden_size)
+        self.fc = nn.Linear(self.hidden_size, n_classes)
         
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
@@ -89,48 +42,63 @@ class QuestNet(nn.Module):
         self.dropouts = nn.ModuleList([
             nn.Dropout(0.5) for _ in range(5)
         ])
-        self.fcs = nn.ModuleList([
-            nn.Linear(self.hidden_size, n_classes) for _ in range(len(hidden_layers))
-        ])
+#         self.fcs_1 = nn.ModuleList(
+#             [ nn.Linear(self.hidden_size, self.hidden_size) for _ in range(len(hidden_layers)) ])
 
     def forward(self, ids, seg_ids):
         attention_mask = (ids > 0)
-        outputs = self.bert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
         
-        # pooled_out = outputs[1] #  N * 768
+        if ((self.model_type == "bert-base-uncased") \
+            or (self.model_type == "bert-base-cased") \
+            or (self.model_type == "bert-large-uncased") \
+            or (self.model_type == "bert-large-cased")):
         
-        # sequence_out = torch.unsqueeze(outputs[0][:, 0], dim=-1) # N * 512 * 768 * 1, hidden_states[-1]
-        # fuse_hidden = sequence_out
+            outputs = self.bert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+            hidden_states = outputs[2]
+            
+            # pooled_out = outputs[1] #  N * 768
         
-        # 13 (embedding + 12 transformers) for base
-        # 26 (embedding + 25 transformers) for large
-        hidden_states = outputs[2]
+            # sequence_out = torch.unsqueeze(outputs[0][:, 0], dim=-1) # N * 512 * 768 * 1, hidden_states[-1]
+            # fuse_hidden = sequence_out
+            
+            # 13 (embedding + 12 transformers) for base
+            # 26 (embedding + 25 transformers) for large
+        
+        elif ((self.model_type == "xlnet-base-cased") \
+            or (self.model_type == "xlnet-large-cased")):
+
+            attention_mask = attention_mask.float()
+            outputs = self.xlnet_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+            hidden_states = outputs[1]
+            
+            # last_hidden_out = outputs[0]
+            # mem = outputs[1], when config.mem_len > 0
         
         # concat hidden
-        # for hidden_layer in self.hidden_layers:
-        #     h = torch.unsqueeze(hidden_states[hidden_layer][:, 0], dim=-1) # N * 768 * 1
-        #     fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
-            
-        # fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
-        # out = self.bert_classification_head(fuse_hidden)
-
-        logits = []
+        for i in range(len(self.hidden_layers)):
+            if i == 0:
+                hidden_layer = self.hidden_layers[i]
+                # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                hidden_state = hidden_states[hidden_layer][:, 0]
+                fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+            else:
+                hidden_layer = self.hidden_layers[i]
+                # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                hidden_state = hidden_states[hidden_layer][:, 0]
+                h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
         
-        for i, fc in enumerate(self.fcs):
+        fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+        h = self.relu(self.fc_1(fuse_hidden))
             
-            hidden_layer = self.hidden_layers[i]
-            h = hidden_states[hidden_layer][:, 0]
+        for j, dropout in enumerate(self.dropouts):
             
-            for j, dropout in enumerate(self.dropouts):
+            if j == 0:
+                logit = self.fc(dropout(h))
+            else:
+                logit += self.fc(dropout(h))
                 
-                if j == 0:
-                    logit = fc(dropout(h))
-                else:
-                    logit += fc(dropout(h))
-                    
-            logits.append(logit / len(self.dropouts))
-                
-        return logits
+        return logit / len(self.dropouts)
         
         
 
