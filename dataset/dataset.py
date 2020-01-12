@@ -82,12 +82,28 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
 ############################################ Define Dataset 
 
 class QuestDataset(torch.utils.data.Dataset):
-    def __init__(self, df, model_type="bert-base-uncased", train_mode=True, labeled=True, augment=True):
+    def __init__(self, df, model_type="xlnet-base-uncased", train_mode=True, labeled=True, augment=True):
         self.df = df
         self.model_type = model_type
         self.train_mode = train_mode
         self.labeled = labeled
-        self.tokenizer = BertTokenizer.from_pretrained(model_type)
+        
+        if ((self.model_type == "bert-base-uncased") \
+            or (self.model_type == "bert-base-cased") \
+            or (self.model_type == "bert-large-uncased") \
+            or (self.model_type == "bert-large-cased")):
+            
+            self.tokenizer = BertTokenizer.from_pretrained(model_type)
+            
+        elif ((self.model_type == "xlnet-base-cased") \
+            or (self.model_type == "xlnet-large-cased")):
+            
+            self.tokenizer = XLNetTokenizer.from_pretrained(model_type)
+            
+        else:
+            
+            raise NotImplementedError
+            
         self.augment = augment
         self.translation_rate = 0.3
 
