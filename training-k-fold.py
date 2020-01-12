@@ -75,7 +75,7 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 ############################################################################## Define Constant
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
-MIN_LR = 1e-7
+MIN_LR = 1e-6
 
 
 ############################################################################## seed All
@@ -137,7 +137,7 @@ def training(
     
     if augment:
         checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
-            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_test/')
+            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_relu/')
     else:
         checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
             optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '/')
@@ -210,10 +210,11 @@ def training(
                       model.bert_model.encoder.layer[9],
                       model.bert_model.encoder.layer[10],
                       model.bert_model.encoder.layer[11],
-                      model.fcs
+                      model.fc_1,
+                      model.fc
                       ]
             
-        if (model_name == "bert-large-uncased"):
+        elif (model_name == "bert-large-uncased"):
         
             list_layers = [model.bert_model.embeddings,
                   model.bert_model.encoder.layer[0],
@@ -240,8 +241,62 @@ def training(
                   model.bert_model.encoder.layer[21],
                   model.bert_model.encoder.layer[22],
                   model.bert_model.encoder.layer[23],
-                  model.fcs
+                  model.fc_1,
+                  model.fc
                   ]
+            
+        elif (model_name == "xlnet-base-cased"):
+            
+            list_layers = [model.xlnet_model.word_embedding,
+                      model.xlnet_model.layer[0],
+                      model.xlnet_model.layer[1],
+                      model.xlnet_model.layer[2],
+                      model.xlnet_model.layer[3],
+                      model.xlnet_model.layer[4],
+                      model.xlnet_model.layer[5],
+                      model.xlnet_model.layer[6],
+                      model.xlnet_model.layer[7],
+                      model.xlnet_model.layer[8],
+                      model.xlnet_model.layer[9],
+                      model.xlnet_model.layer[10],
+                      model.xlnet_model.layer[11],
+                      model.fc_1,
+                      model.fc
+                      ]
+            
+        elif (model_name == "xlnet-large-cased"):
+            
+            list_layers = [model.xlnet_model.word_embedding,
+                      model.xlnet_model.layer[0],
+                      model.xlnet_model.layer[1],
+                      model.xlnet_model.layer[2],
+                      model.xlnet_model.layer[3],
+                      model.xlnet_model.layer[4],
+                      model.xlnet_model.layer[5],
+                      model.xlnet_model.layer[6],
+                      model.xlnet_model.layer[7],
+                      model.xlnet_model.layer[8],
+                      model.xlnet_model.layer[9],
+                      model.xlnet_model.layer[10],
+                      model.xlnet_model.layer[11],
+                      model.xlnet_model.layer[12],
+                      model.xlnet_model.layer[13],
+                      model.xlnet_model.layer[14],
+                      model.xlnet_model.layer[15],
+                      model.xlnet_model.layer[16],
+                      model.xlnet_model.layer[17],
+                      model.xlnet_model.layer[18],
+                      model.xlnet_model.layer[19],
+                      model.xlnet_model.layer[20],
+                      model.xlnet_model.layer[21],
+                      model.xlnet_model.layer[22],
+                      model.xlnet_model.layer[23],
+                      model.fc_1,
+                      model.fc
+                      ]
+            
+        else:
+            raise NotImplementedError
 
 #         for i in range(len(list_layers)):
 #             list_lr.append(lr)
@@ -395,41 +450,8 @@ def training(
             labels    = labels.cuda().float()
 
             # predict and calculate loss (only need torch.sigmoid when inference)
-            predictions = model(token_ids, seg_ids)  
-            
-            if epoch < int(num_epoch / 4):
-                num_loss = len(predictions)
-                for i in range(num_loss):
-                    prediction = predictions[i]
-                    if i == 0:
-                        loss = criterion(prediction, labels)
-                    else:
-                        loss += criterion(prediction, labels)
-                    
-                loss /= num_loss
-            elif epoch < int(num_epoch / 2):
-                num_loss = int(len(predictions) * 3 / 4)
-                for i in range(num_loss):
-                    prediction = predictions[i]
-                    if i == 0:
-                        loss = criterion(prediction, labels)
-                    else:
-                        loss += criterion(prediction, labels)
-                    
-                loss /= num_loss
-            elif epoch < int(num_epoch * 3 / 4):
-                num_loss = int(len(predictions) / 2)
-                for i in range(num_loss):
-                    prediction = predictions[i]
-                    if i == 0:
-                        loss = criterion(prediction, labels)
-                    else:
-                        loss += criterion(prediction, labels)
-                    
-                loss /= num_loss  
-            else:
-                prediction = predictions[0]
-                loss = criterion(prediction, labels)
+            prediction = model(token_ids, seg_ids)  
+            loss = criterion(prediction, labels)
             
             # use apex
             with amp.scale_loss(loss/accumulation_steps, optimizer) as scaled_loss:
@@ -449,7 +471,7 @@ def training(
                 writer.add_scalar('train_loss_' + str(fold), loss.item(), (epoch-1)*len(train_data_loader)*batch_size+tr_batch_i*batch_size)
             
             # calculate statistics
-            prediction = torch.sigmoid(predictions[0])
+            prediction = torch.sigmoid(prediction)
 
             if tr_batch_i == 0:
                 labels_train = labels.cpu().detach().numpy()
@@ -496,46 +518,13 @@ def training(
                         labels    = labels.cuda().float()
 
                         # predict and calculate loss (only need torch.sigmoid when inference)
-                        predictions = model(token_ids, seg_ids)  
-                        
-                        if epoch < int(num_epoch / 4):
-                            num_loss = len(predictions)
-                            for i in range(num_loss):
-                                prediction = predictions[i]
-                                if i == 0:
-                                    loss = criterion(prediction, labels)
-                                else:
-                                    loss += criterion(prediction, labels)
-                                
-                            loss /= num_loss
-                        elif epoch < int(num_epoch / 2):
-                            num_loss = int(len(predictions) * 3 / 4)
-                            for i in range(num_loss):
-                                prediction = predictions[i]
-                                if i == 0:
-                                    loss = criterion(prediction, labels)
-                                else:
-                                    loss += criterion(prediction, labels)
-                                
-                            loss /= num_loss
-                        elif epoch < int(num_epoch * 3 / 4):
-                            num_loss = int(len(predictions) / 2)
-                            for i in range(num_loss):
-                                prediction = predictions[i]
-                                if i == 0:
-                                    loss = criterion(prediction, labels)
-                                else:
-                                    loss += criterion(prediction, labels)
-                                
-                            loss /= num_loss
-                        else:
-                            prediction = predictions[0]
-                            loss = criterion(prediction, labels)
+                        prediction = model(token_ids, seg_ids)  
+                        loss = criterion(prediction, labels)
                             
                         writer.add_scalar('val_loss_' + str(fold), loss.item(), (eval_count-1)*len(val_data_loader)*valid_batch_size+val_batch_i*valid_batch_size)
                         
                         # calculate statistics
-                        prediction = torch.sigmoid(predictions[0])
+                        prediction = torch.sigmoid(prediction)
 
                         if val_batch_i == 0:
                             labels_val = labels.cpu().detach().numpy()
@@ -575,7 +564,7 @@ if __name__ == "__main__":
     seed_everything(args.seed)
 
     # get train val split
-    data_path = args.train_data_folder + "train_augment_old.csv"
+    data_path = args.train_data_folder + "train_augment_clean.csv"
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
