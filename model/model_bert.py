@@ -13,22 +13,22 @@ class QuestNet(nn.Module):
         self.hidden_layers = hidden_layers
         
         if model_type == "bert-base-uncased":
-            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.2, \
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
                                                     output_hidden_states=True, force_download=True)   
             self.hidden_size = 768
         elif model_type == "bert-large-uncased":
-            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.2, \
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
                                                     output_hidden_states=True, force_download=True)   
             self.hidden_size = 1024
         elif model_type == "bert-base-cased":
-            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.2, \
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
                                                     output_hidden_states=True, force_download=True)   
             self.hidden_size = 768
         elif model_type == "xlnet-base-cased":
-            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.2, output_hidden_states=True)   
+            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.1, output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "xlnet-large-cased":
-            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.2, output_hidden_states=True)   
+            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.1, output_hidden_states=True)   
             self.hidden_size = 1024
         else:
             raise NotImplementedError
@@ -63,6 +63,23 @@ class QuestNet(nn.Module):
             
             # 13 (embedding + 12 transformers) for base
             # 26 (embedding + 25 transformers) for large
+            
+            # concat hidden
+            for i in range(len(self.hidden_layers)):
+                if i == 0:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
+                    fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                else:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
+                    h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                    fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
+                    
+            fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+            h = self.relu(self.fc_1(fuse_hidden))
         
         elif ((self.model_type == "xlnet-base-cased") \
             or (self.model_type == "xlnet-large-cased")):
@@ -73,23 +90,23 @@ class QuestNet(nn.Module):
             
             # last_hidden_out = outputs[0]
             # mem = outputs[1], when config.mem_len > 0
+            
+            # concat hidden, summary_type="last", first_dropout = 0
+            for i in range(len(self.hidden_layers)):
+                if i == 0:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, -1]
+                    fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                else:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, -1]
+                    h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                    fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
         
-        # concat hidden
-        for i in range(len(self.hidden_layers)):
-            if i == 0:
-                hidden_layer = self.hidden_layers[i]
-                # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
-                hidden_state = hidden_states[hidden_layer][:, 0]
-                fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
-            else:
-                hidden_layer = self.hidden_layers[i]
-                # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
-                hidden_state = hidden_states[hidden_layer][:, 0]
-                h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
-                fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
-        
-        fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
-        h = self.relu(self.fc_1(fuse_hidden))
+            fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+            h = self.relu(self.fc_1(fuse_hidden))
             
         for j, dropout in enumerate(self.dropouts):
             
