@@ -1,5 +1,6 @@
 # import os and define graphic card
 import os
+os.environ["OMP_NUM_THREADS"] = "1"
 
 # import common libraries
 import gc
@@ -42,13 +43,13 @@ from model.model_bert import *
 
 ############################################################################## Define Argument
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument("--train_data_folder", type=str, default="/workspace/input/google-quest-challenge/", \
+parser.add_argument("--train_data_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/", \
     required=False, help="specify the folder for training data")
 parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -2, -3, -4], \
+parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -62,7 +63,7 @@ parser.add_argument("--accumulation_steps", type=int, default=4, required=False,
 parser.add_argument('--num_workers', type=int, default=2, \
     required=False, help='specify the num_workers for testing dataloader')
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
-parser.add_argument("--checkpoint_folder", type=str, default="/workspace/model", \
+parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model", \
     required=False, help="specify the folder for checkpoint")
 parser.add_argument('--load_pretrain', action='store_true', default=False, help='whether to load pretrain model')
 parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
@@ -379,7 +380,7 @@ def training(
 
     ###############################################################################  mix precision
     model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
-    model = nn.DataParallel(model)
+    # model = nn.DataParallel(model)
 
     ############################################################################### eval setting
     eval_step = len(train_data_loader) # or len(train_data_loader) 
