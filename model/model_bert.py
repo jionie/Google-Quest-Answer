@@ -91,17 +91,17 @@ class QuestNet(nn.Module):
             # last_hidden_out = outputs[0]
             # mem = outputs[1], when config.mem_len > 0
             
-            # concat hidden, summary_type="last", first_dropout = 0
+            # concat hidden, summary_type="first", first_dropout = 0
             for i in range(len(self.hidden_layers)):
                 if i == 0:
                     hidden_layer = self.hidden_layers[i]
-                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
-                    hidden_state = hidden_states[hidden_layer][:, -1]
+                    # hidden_state = hidden_states[hidden_layer].mean(dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
                     fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
                 else:
                     hidden_layer = self.hidden_layers[i]
-                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
-                    hidden_state = hidden_states[hidden_layer][:, -1]
+                    # hidden_state = hidden_states[hidden_layer].mean(dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
                     h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
                     fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
         
