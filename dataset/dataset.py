@@ -18,15 +18,15 @@ import nlpaug.flow as naf
 ############################################ Define augments for test
 
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument('-data_path', type=str, default="/workspace/input/google-quest-challenge/train_augment.csv", \
+parser.add_argument('-data_path', type=str, default="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/train_augment.csv", \
     required=False, help='specify the path for train.csv')
-parser.add_argument('-test_data_path', type=str, default="/workspace/input/google-quest-challenge/test.csv", \
+parser.add_argument('-test_data_path', type=str, default="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/test.csv", \
     required=False, help='specify the path for test.csv')
 parser.add_argument('--n_splits', type=int, default=5, \
     required=False, help='specify the number of folds')
-parser.add_argument('--seed', type=int, default=42, \
+parser.add_argument('--seed', type=int, default=720, \
     required=False, help='specify the random seed for splitting dataset')
-parser.add_argument('--save_path', type=str, default="/workspace/input/google-quest-challenge/", \
+parser.add_argument('--save_path', type=str, default="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/", \
     required=False, help='specify the path for saving splitted csv')
 parser.add_argument('--test_fold', type=int, default=0, \
     required=False, help='specify the test fold for testing dataloader')
@@ -320,7 +320,7 @@ class QuestDataset(torch.utils.data.Dataset):
             return token_ids, seg_ids
 
 
-def get_test_loader(data_path="/workspace/input/google-quest-challenge/test.csv", model_type="bert-base-uncased", batch_size=4):
+def get_test_loader(data_path="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/test.csv", model_type="bert-base-uncased", batch_size=4):
     df = pd.read_csv(data_path)
     ds_test = QuestDataset(df, model_type, train_mode=False, labeled=False, augment=False)
     loader = torch.utils.data.DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=ds_test.collate_fn, drop_last=False)
@@ -328,10 +328,10 @@ def get_test_loader(data_path="/workspace/input/google-quest-challenge/test.csv"
     
     return loader
 
-def get_train_val_split(data_path="/workspace/input/google-quest-challenge/train_augment.csv", \
-                        save_path="/workspace/input/google-quest-challenge/", \
+def get_train_val_split(data_path="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/train_augment.csv", \
+                        save_path="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/", \
                         n_splits=5, \
-                        seed=42):
+                        seed=720):
 
     os.makedirs(save_path + '/split', exist_ok=True)
     df = pd.read_csv(data_path, encoding='utf8')

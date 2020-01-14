@@ -42,7 +42,7 @@ from model.model_bert import *
 
 ############################################################################## Define Argument
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument("--train_data_folder", type=str, default="/workspace/input/google-quest-challenge/", \
+parser.add_argument("--train_data_folder", type=str, default="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/", \
     required=False, help="specify the folder for training data")
 parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
