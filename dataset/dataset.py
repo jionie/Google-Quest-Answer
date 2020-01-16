@@ -105,9 +105,9 @@ class QuestDataset(torch.utils.data.Dataset):
             raise NotImplementedError
             
         self.augment = augment
-        self.translation_title_rate = 1
-        self.translation_body_rate = 1
-        self.translation_answer_rate = 1
+        self.translation_title_rate = 0.6
+        self.translation_body_rate = 0.4
+        self.translation_answer_rate = 0.4
         self.random_select_date = 0.2
 
     def __getitem__(self, index):
