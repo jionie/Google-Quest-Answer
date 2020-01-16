@@ -437,7 +437,7 @@ def training(
         model.zero_grad()
         
         for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
-            
+   
             rate = 0
             for param_group in optimizer.param_groups:
                 rate += param_group['lr'] / len(optimizer.param_groups)
@@ -495,7 +495,6 @@ def training(
                 log.write('lr: %f train loss: %f train_spearman: %f\n' % \
                     (rate, train_loss[0], spearman))
             
-
             if (tr_batch_i+1) % eval_step == 0:  
                 
                 eval_count += 1

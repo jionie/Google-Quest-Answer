@@ -105,9 +105,9 @@ class QuestDataset(torch.utils.data.Dataset):
             raise NotImplementedError
             
         self.augment = augment
-        self.translation_title_rate = 0.75
-        self.translation_body_rate = 0.5
-        self.translation_answer_rate = 0.5
+        self.translation_title_rate = 1
+        self.translation_body_rate = 1
+        self.translation_answer_rate = 1
         self.random_select_date = 0.2
 
     def __getitem__(self, index):
@@ -123,13 +123,16 @@ class QuestDataset(torch.utils.data.Dataset):
         return len(self.df)
 
     def augmentation(self, text, insert=False, substitute=False, swap=True, delete=True):
+        
+        augs = []
+        
         if insert:
             # aug = naw.ContextualWordEmbsAug(
             #     model_path=self.model_type, action="insert", device='cuda')
             aug = naw.WordEmbsAug(
                 model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
                 action="insert")
-            text = aug.augment(text)
+            augs.append(aug)
         
         if substitute:
             # aug = naw.ContextualWordEmbsAug(
@@ -138,17 +141,20 @@ class QuestDataset(torch.utils.data.Dataset):
             #     model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
             #     action="substitute")
             aug_sub = naw.SynonymAug(aug_src='wordnet')
+            augs.append(aug_sub)
             # text = aug.augment(text)
 
         if swap:
             aug_swap = naw.RandomWordAug(action="swap")
+            augs.append(aug_swap)
             # text = aug.augment(text)
 
         if delete:
             aug_del = naw.RandomWordAug()
+            augs.append(aug_del)
             # text = aug.augment(text)
             
-        aug = naf.Sometimes([aug_sub, aug_del], aug_p=0.5, pipeline_p=0.5)
+        aug = naf.Sometimes(augs, aug_p=0.5, pipeline_p=0.5)
         # print("before aug:", text)
         text = aug.augment(text, n=1)
         # print("after aug:", text)
@@ -169,12 +175,12 @@ class QuestDataset(torch.utils.data.Dataset):
                 t_max_len=30, q_max_len=239, a_max_len=239):
 
         if self.augment:
-#             print("title: ", title)
-            title = self.augmentation(title, insert=False, substitute=True, swap=True, delete=True)
-#             print("question: ", question)
-            question = self.augmentation(question, insert=False, substitute=True, swap=True, delete=True)
-#             print("answer: ", answer)
-            answer = self.augmentation(answer, insert=False, substitute=True, swap=True, delete=True)
+            # print("title: ", title)
+            title = self.augmentation(title, insert=False, substitute=True, swap=False, delete=True)
+            # print("question: ", question)
+            question = self.augmentation(question, insert=False, substitute=True, swap=False, delete=True)
+            # print("answer: ", answer)
+            answer = self.augmentation(answer, insert=False, substitute=True, swap=False, delete=True)
 
         t = self.tokenizer.tokenize(title)
         q = self.tokenizer.tokenize(question)
@@ -256,7 +262,6 @@ class QuestDataset(torch.utils.data.Dataset):
         return t, q, a
         
     def get_token_ids(self, row, index):
-        
         if self.augment:
             
             if random.random() < self.translation_title_rate:
@@ -268,6 +273,10 @@ class QuestDataset(torch.utils.data.Dataset):
                     title = row.t_german
             else:
                 title = row.question_title
+            
+            if not isinstance(title, str):
+                if np.isnan(title):
+                    title = row.question_title
                 
             if random.random() < self.translation_body_rate:
                 if random.random() < 1/3:
@@ -278,6 +287,10 @@ class QuestDataset(torch.utils.data.Dataset):
                     question = row.b_german
             else:
                 question = row.question_body
+            
+            if not isinstance(question, str):    
+                if np.isnan(question):
+                    question = row.question_question
                 
             if random.random() < self.translation_answer_rate:
                 if random.random() < 1/3:
@@ -288,7 +301,11 @@ class QuestDataset(torch.utils.data.Dataset):
                     answer = row.a_german
             else:
                 answer = row.answer
-                
+            
+            if not isinstance(answer, str):
+                if np.isnan(answer):
+                    answer = row.answer
+             
             t_tokens, q_tokens, a_tokens = self.trim_input(title, question, answer)
             
         else:
