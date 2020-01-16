@@ -105,8 +105,10 @@ class QuestDataset(torch.utils.data.Dataset):
             raise NotImplementedError
             
         self.augment = augment
-        self.translation_rate = 0.3
-        self.random_select_date = 0.1
+        self.translation_title_rate = 0.75
+        self.translation_body_rate = 0.5
+        self.translation_answer_rate = 0.5
+        self.random_select_date = 0.2
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
@@ -257,18 +259,33 @@ class QuestDataset(torch.utils.data.Dataset):
         
         if self.augment:
             
-            if random.random() < self.translation_rate:
-                title = row.t_aug
+            if random.random() < self.translation_title_rate:
+                if random.random() < 1/3:
+                    title = row.t_chinese
+                elif random.random() < 2/3:
+                    title = row.t_french
+                else:
+                    title = row.t_german
             else:
                 title = row.question_title
                 
-            if random.random() < self.translation_rate:
-                question = row.q_aug
+            if random.random() < self.translation_body_rate:
+                if random.random() < 1/3:
+                    question = row.b_chinese
+                elif random.random() < 2/3:
+                    question = row.b_french
+                else:
+                    question = row.b_german
             else:
                 question = row.question_body
                 
-            if random.random() < self.translation_rate:
-                answer = row.a_aug
+            if random.random() < self.translation_answer_rate:
+                if random.random() < 1/3:
+                    answer = row.a_chinese
+                elif random.random() < 2/3:
+                    answer = row.a_french
+                else:
+                    answer = row.a_german
             else:
                 answer = row.answer
                 

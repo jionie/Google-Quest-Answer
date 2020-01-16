@@ -565,7 +565,7 @@ if __name__ == "__main__":
     seed_everything(args.seed)
 
     # get train val split
-    data_path = args.train_data_folder + "train_augment_clean.csv"
+    data_path = args.train_data_folder + "train_augment_final.csv"
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
