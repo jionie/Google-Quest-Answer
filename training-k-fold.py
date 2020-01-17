@@ -77,6 +77,12 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
 MIN_LR = 1e-6
+TRAING_WEIGIHT = [2, 1, 2, 2, 2, 2, \
+                  1, 2, 2, 4, 1, 2, \
+                  4, 4, 4, 4, 1, 2, \
+                  1, 4, 2, 2, 2, 2, \
+                  2, 1, 1, 2, 1 , 2]
+# 1 is balanced, 2 is unbalanced, 4 is extremely unbalanced
 
 
 ############################################################################## seed All
@@ -403,7 +409,8 @@ def training(
     if loss == 'mse':
         criterion = MSELoss()
     elif loss == 'bce':
-        criterion = nn.BCEWithLogitsLoss()
+        weights = torch.tensor(np.array(TRAING_WEIGIHT) / np.sum(TRAING_WEIGIHT) * 30).cuda()
+        criterion = nn.BCEWithLogitsLoss(weight=weights)
     elif loss == 'mse-bce':
         criterion = MSEBCELoss()
     elif loss == 'focal':
