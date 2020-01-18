@@ -77,12 +77,20 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
 MIN_LR = 1e-6
-TRAING_WEIGIHT = [2, 1, 2, 2, 2, 2, \
-                  1, 2, 2, 4, 1, 2, \
-                  4, 4, 4, 4, 1, 2, \
-                  1, 4, 2, 2, 2, 2, \
-                  2, 1, 1, 2, 1 , 2]
-# 1 is balanced, 2 is unbalanced, 4 is extremely unbalanced
+# UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
+#                   1, 2, 2, 4, 1, 2, \
+#                   4, 4, 4, 4, 1, 2, \
+#                   1, 4, 2, 2, 2, 2, \
+#                   2, 1, 1, 2, 1, 2]
+
+UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 1, 1, 1]
+
+TRAING_WEIGIHT = [i for i in UNBALANCE_WEIGIHT]
+# 1 is balanced, 2 is unbalanced, 3 is extremely unbalanced
 
 
 ############################################################################## seed All
@@ -409,7 +417,8 @@ def training(
     if loss == 'mse':
         criterion = MSELoss()
     elif loss == 'bce':
-        weights = torch.tensor(np.array(TRAING_WEIGIHT) / np.sum(TRAING_WEIGIHT) * 30).cuda()
+        # weights = torch.tensor(np.array(TRAING_WEIGIHT) / np.sum(TRAING_WEIGIHT) * 30, dtype=torch.float64).cuda()
+        weights = torch.tensor(np.array(TRAING_WEIGIHT), dtype=torch.float64).cuda()
         criterion = nn.BCEWithLogitsLoss(weight=weights)
     elif loss == 'mse-bce':
         criterion = MSEBCELoss()
@@ -571,7 +580,7 @@ if __name__ == "__main__":
     seed_everything(args.seed)
 
     # get train val split
-    data_path = args.train_data_folder + "train_augment_final.csv"
+    data_path = args.train_data_folder + "train_augment_final_with_clean.csv"
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
