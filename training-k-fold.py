@@ -76,7 +76,7 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 ############################################################################## Define Constant
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
-MIN_LR = 2e-6
+MIN_LR = 1.5e-6
 # UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
 #                   1, 2, 2, 4, 1, 2, \
 #                   4, 4, 4, 4, 1, 2, \
@@ -84,8 +84,8 @@ MIN_LR = 2e-6
 #                   2, 1, 1, 2, 1, 2]
 
 UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, \
-                     1, 1, 1, 1, 1, 1, \
-                     1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 2, 1, 1, \
+                     2, 2, 2, 2, 1, 1, \
                      1, 1, 1, 1, 1, 1, \
                      1, 1, 1, 1, 1, 1]
 
