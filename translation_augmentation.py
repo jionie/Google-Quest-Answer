@@ -7,10 +7,10 @@ import os
 import pandas as pd
 
 parser = argparse.ArgumentParser("Script for extending train dataset")
-parser.add_argument("--train_file_path", type=str, default="/workspace/input/google-quest-challenge/train.csv", required=False)
+parser.add_argument("--train_file_path", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train.csv", required=False)
 parser.add_argument("--languages", nargs="+", default=["es", "de", "fr", "zh"], required=False)
 parser.add_argument("--thread-count", type=int, default=100, required=False)
-parser.add_argument("--result-path", type=str, default="/workspace/input/google-quest-challenge/", required=False)
+parser.add_argument("--result-path", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/", required=False)
 
 NAN_WORD = "_NAN_"
 

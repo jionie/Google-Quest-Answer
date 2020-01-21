@@ -1,6 +1,7 @@
 # import os and define graphic card
 import os
-
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 # import common libraries
 import gc
 import random
@@ -48,7 +49,7 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -2, -3, -4], \
+parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -62,7 +63,7 @@ parser.add_argument("--accumulation_steps", type=int, default=4, required=False,
 parser.add_argument('--num_workers', type=int, default=2, \
     required=False, help='specify the num_workers for testing dataloader')
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
-parser.add_argument("--checkpoint_folder", type=str, default="/workspace/model", \
+parser.add_argument("--checkpoint_folder", type=str, default="/home/leon/Leon/Kaggle/Google/Google_Quest_Answer/workspace/model", \
     required=False, help="specify the folder for checkpoint")
 parser.add_argument('--load_pretrain', action='store_true', default=False, help='whether to load pretrain model')
 parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
@@ -129,7 +130,7 @@ def training(
         COMMON_STRING += '\t\tos[\'CUDA_VISIBLE_DEVICES\']     = %s\n'%os.environ['CUDA_VISIBLE_DEVICES']
         NUM_CUDA_DEVICES = len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
     except Exception:
-        COMMON_STRING += '\t\tos[\'CUDA_VISIBLE_DEVICES\']     = None\n'
+        COMMON_STRING += '\t\tos[\'CUDA_VISIBLE_DEVICES\']     = 0\n'
         NUM_CUDA_DEVICES = 1
 
     COMMON_STRING += '\t\ttorch.cuda.device_count()      = %d\n'%torch.cuda.device_count()
@@ -294,7 +295,61 @@ def training(
                       model.fc_1,
                       model.fc
                       ]
+        elif (model_name == "roberta-base"):
             
+            list_layers = [model.roberta_model.word_embedding,
+                      model.roberta_model.layer[0],
+                      model.roberta_model.layer[1],
+                      model.roberta_model.layer[2],
+                      model.roberta_model.layer[3],
+                      model.roberta_model.layer[4],
+                      model.roberta_model.layer[5],
+                      model.roberta_model.layer[6],
+                      model.roberta_model.layer[7],
+                      model.roberta_model.layer[8],
+                      model.roberta_model.layer[9],
+                      model.roberta_model.layer[10],
+                      model.roberta_model.layer[11],
+                      model.fc_1,
+                      model.fc
+                      ]
+        elif (model_name == "albert-base-v2"):
+            
+            list_layers = [model.albert_model.word_embedding,
+                      model.albert_model.layer[0],
+                      model.albert_model.layer[1],
+                      model.albert_model.layer[2],
+                      model.albert_model.layer[3],
+                      model.albert_model.layer[4],
+                      model.albert_model.layer[5],
+                      model.albert_model.layer[6],
+                      model.albert_model.layer[7],
+                      model.albert_model.layer[8],
+                      model.albert_model.layer[9],
+                      model.albert_model.layer[10],
+                      model.albert_model.layer[11],
+                      model.fc_1,
+                      model.fc
+                      ]
+                      
+        elif (model_name == "gpt2"):
+            
+            list_layers = [model.gpt2_model.word_embedding,
+                      model.gpt2_model.layer[0],
+                      model.gpt2_model.layer[1],
+                      model.gpt2_model.layer[2],
+                      model.gpt2_model.layer[3],
+                      model.gpt2_model.layer[4],
+                      model.gpt2_model.layer[5],
+                      model.gpt2_model.layer[6],
+                      model.gpt2_model.layer[7],
+                      model.gpt2_model.layer[8],
+                      model.gpt2_model.layer[9],
+                      model.gpt2_model.layer[10],
+                      model.gpt2_model.layer[11],
+                      model.fc_1,
+                      model.fc
+                      ]
         else:
             raise NotImplementedError
 
@@ -379,7 +434,7 @@ def training(
 
     ###############################################################################  mix precision
     model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
-    model = nn.DataParallel(model)
+    # model = nn.DataParallel(model)
 
     ############################################################################### eval setting
     eval_step = len(train_data_loader) # or len(train_data_loader) 
@@ -452,7 +507,8 @@ def training(
             # predict and calculate loss (only need torch.sigmoid when inference)
             prediction = model(token_ids, seg_ids)  
             loss = criterion(prediction, labels)
-            
+            # print(token_ids)
+            # print('*******************', seg_ids)
             # use apex
             with amp.scale_loss(loss/accumulation_steps, optimizer) as scaled_loss:
                 scaled_loss.backward()

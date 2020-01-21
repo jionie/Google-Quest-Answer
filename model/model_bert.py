@@ -30,6 +30,15 @@ class QuestNet(nn.Module):
         elif model_type == "xlnet-large-cased":
             self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.1, output_hidden_states=True)   
             self.hidden_size = 1024
+        elif model_type == "roberta-base":
+            self.roberta_model = RobertaModel.from_pretrained(model_type, hidden_dropout_prob=0.1, output_hidden_states=True, force_download=True)   
+            self.hidden_size = 768
+        elif model_type == "albert-base-v2":
+            self.albert_model = AutoModel.from_pretrained(model_type, hidden_dropout_prob=0.1, output_hidden_states=True, force_download=True)   
+            self.hidden_size = 768
+        elif model_type == "gpt2":
+            self.gpt2_model = AutoModel.from_pretrained(model_type, initializer_range=0.02, output_hidden_states=True, force_download=True)   
+            self.hidden_size = 768
         else:
             raise NotImplementedError
         
@@ -55,6 +64,7 @@ class QuestNet(nn.Module):
         
             outputs = self.bert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
             hidden_states = outputs[2]
+            # print('******************************', type(hidden_states))
             
             # pooled_out = outputs[1] #  N * 768
         
@@ -107,6 +117,83 @@ class QuestNet(nn.Module):
         
             fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
             h = self.relu(self.fc_1(fuse_hidden))
+        elif (self.model_type == "roberta-base"):
+            attention_mask = (ids>0).float()
+
+            # layers, pool_out = self.roberta_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+
+            outputs = self.roberta_model(input_ids=ids, attention_mask=attention_mask, token_type_ids=seg_ids)#, attention_mask=attention_mask)
+            hidden_states = outputs[2]
+            # print('******************************', type(hidden_states))
+            
+            # last_hidden_out = outputs[0]
+            # mem = outputs[1], when config.mem_len > 0
+            
+            # concat hidden, summary_type="last", first_dropout = 0
+            for i in range(len(self.hidden_layers)):
+                if i == 0:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, -1]
+                    fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                else:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, -1]
+                    h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                    fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
+            fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+            h = self.relu(self.fc_1(fuse_hidden))
+        elif (self.model_type == "albert-base-v2"):
+
+            attention_mask = attention_mask.float()
+            outputs = self.albert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+            hidden_states = outputs[2]
+            
+            # last_hidden_out = outputs[0]
+            # mem = outputs[1], when config.mem_len > 0
+            
+            # concat hidden, summary_type="last", first_dropout = 0
+            for i in range(len(self.hidden_layers)):
+                if i == 0:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
+                    fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                else:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
+                    h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                    fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
+                    
+            fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+            h = self.relu(self.fc_1(fuse_hidden))
+        elif (self.model_type == "gpt2"):
+
+            attention_mask = attention_mask.float()
+            outputs = self.gpt2_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+            hidden_states = outputs[2]
+            
+            # last_hidden_out = outputs[0]
+            # mem = outputs[1], when config.mem_len > 0
+            
+            # concat hidden, summary_type="last", first_dropout = 0
+            for i in range(len(self.hidden_layers)):
+                if i == 0:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
+                    fuse_hidden = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                else:
+                    hidden_layer = self.hidden_layers[i]
+                    # hidden_state = torch.mean(hidden_states[hidden_layer], dim=1)
+                    hidden_state = hidden_states[hidden_layer][:, 0]
+                    h = torch.unsqueeze(hidden_state, dim=-1) # N * 768 * 1
+                    fuse_hidden = torch.cat([fuse_hidden, h], dim=-1)
+                    
+            fuse_hidden = fuse_hidden.reshape(fuse_hidden.shape[0], -1)
+            h = self.relu(self.fc_1(fuse_hidden))
             
         for j, dropout in enumerate(self.dropouts):
             
@@ -114,7 +201,7 @@ class QuestNet(nn.Module):
                 logit = self.fc(dropout(h))
             else:
                 logit += self.fc(dropout(h))
-                
+        
         return logit / len(self.dropouts)
         
         

@@ -1,0 +1,13 @@
+python training-k-fold.py --model_name "roberta-base" --fold 0 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 1 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 2 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 3 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 4 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 5 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 6 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 7 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 8 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+python training-k-fold.py --model_name "roberta-base" --fold 9 --seed 1996 --n_splits 10 --batch_size 4 --valid_batch_size 32 --accumulation_steps 2 --lr 2e-4 --loss "bce" --augment --num_epoch 13 --num_workers 4
+
+
+

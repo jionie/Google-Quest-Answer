@@ -100,18 +100,26 @@ class QuestDataset(torch.utils.data.Dataset):
             
             self.tokenizer = XLNetTokenizer.from_pretrained(model_type)
             
+        elif((self.model_type == "roberta-base")):
+            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+        elif((self.model_type == "albert-base-v2")):
+            self.tokenizer = AutoTokenizer.from_pretrained("albert-base-v2")
+        elif((self.model_type == "gpt2")):
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
         else:
             
             raise NotImplementedError
             
         self.augment = augment
         self.translation_rate = 0.3
+        self.random_select_date = 0.1
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
         token_ids, seg_ids = self.get_token_ids(row, index)
         if self.labeled:
             labels = self.get_label(row)
+            # print(labels)
             return token_ids, seg_ids, labels
         else:
             return token_ids, seg_ids
@@ -124,7 +132,7 @@ class QuestDataset(torch.utils.data.Dataset):
             # aug = naw.ContextualWordEmbsAug(
             #     model_path=self.model_type, action="insert", device='cuda')
             aug = naw.WordEmbsAug(
-                model_type='word2vec', model_path='/workspace/model/word2vec/GoogleNews-vectors-negative300.bin',
+                model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
                 action="insert")
             text = aug.augment(text)
         
@@ -205,55 +213,50 @@ class QuestDataset(torch.utils.data.Dataset):
                 raise ValueError("New sequence length should be %d, but is %d" 
                                  % (max_sequence_length, (t_new_len+a_new_len+q_new_len+4)))
 
-            # random select
-#             if self.augment:
-                
-#                 if len(t) - t_new_len > 0:
-#                     t_start = np.random.randint(0, len(t) - t_new_len)
-#                 else:
-#                     t_start = 0
+            if self.augment:
+                # random select
+                if random.random() < self.random_select_date:
+                    if len(t) - t_new_len > 0:
+                        t_start = np.random.randint(0, len(t) - t_new_len)
+                    else:
+                        t_start = 0
 
-#                 if len(q) - q_new_len > 0:
-#                     q_start = np.random.randint(0, len(q) - q_new_len)
-#                 else:
-#                     q_start = 0
+                    if len(q) - q_new_len > 0:
+                        q_start = np.random.randint(0, len(q) - q_new_len)
+                    else:
+                        q_start = 0
 
-#                 if len(a) - a_new_len > 0:
-#                     a_start = np.random.randint(0, len(a) - a_new_len)
-#                 else:
-#                     a_start = 0
+                    if len(a) - a_new_len > 0:
+                        a_start = np.random.randint(0, len(a) - a_new_len)
+                    else:
+                        a_start = 0
 
-#                 t = t[t_start : (t_start + t_new_len)]
-#                 q = q[q_start : (q_start + q_new_len)]
-#                 a = a[a_start : (a_start + a_new_len)]
+                    t = t[t_start : (t_start + t_new_len)]
+                    q = q[q_start : (q_start + q_new_len)]
+                    a = a[a_start : (a_start + a_new_len)]
+                    
+                else:
+                    # truncate
+                    if len(t) - t_new_len > 0:
+                        t = t[:t_new_len//4] + t[len(t)-t_new_len+t_new_len//4:]
+                    else:
+                        t = t[:t_new_len]
 
-#             else:
+                    if len(q) - q_new_len > 0:
+                        q = q[:q_new_len//4] + q[len(q)-q_new_len+q_new_len//4:]
+                    else:
+                        q = q[:q_new_len]
 
-#                 t = t[:t_new_len]
-#                 q = q[:q_new_len]
-#                 a = a[:a_new_len]
-            
-            # truncate
-            if len(t) - t_new_len > 0:
-                t = t[:t_new_len//4] + t[len(t)-t_new_len+t_new_len//4:]
+                    if len(a) - a_new_len > 0:
+                        a = a[:a_new_len//4] + a[len(a)-a_new_len+a_new_len//4:]
+                    else:
+                        a = a[:a_new_len]
+                        
             else:
+    
                 t = t[:t_new_len]
-
-            if len(q) - q_new_len > 0:
-                q = q[:q_new_len//4] + q[len(q)-q_new_len+q_new_len//4:]
-            else:
                 q = q[:q_new_len]
-
-            if len(a) - a_new_len > 0:
-                a = a[:a_new_len//4] + a[len(a)-a_new_len+a_new_len//4:]
-            else:
                 a = a[:a_new_len]
-
-#             t = t[:t_new_len]
-#             q = q[:q_new_len]
-#             a = a[:a_new_len]
-                
-#             print(len(t), t_new_len, len(q), q_new_len, len(a), a_new_len)
 
         return t, q, a
         
@@ -350,8 +353,8 @@ def get_train_val_split(data_path="/home/leon/Leon/Kaggle/Google/Google-Quest-An
     return 
     
 
-def get_train_val_loaders(train_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
-                        val_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                        val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                         model_type="bert-base-uncased", \
                         batch_size=4, \
                         val_batch_size=4, \
@@ -395,8 +398,8 @@ def test_train_val_split(data_path, \
 
     return
 
-def test_train_loader(train_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
-                     val_data_path="/workspace/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                     val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                      model_type="bert-base-uncased", \
                      batch_size=4, \
                      val_batch_size=4, \
@@ -426,7 +429,7 @@ def test_train_loader(train_data_path="/workspace/input/google-quest-challenge/s
         break
 
 
-def test_test_loader(data_path="/workspace/input/google-quest-challenge/test.csv", \
+def test_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
                      model_type="bert-base-uncased", \
                      batch_size=4):
 
