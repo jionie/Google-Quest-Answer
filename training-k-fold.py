@@ -49,7 +49,7 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
+parser.add_argument('--hidden_layers', type=list, default=[-1, -2, -4, -6, -8], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -76,7 +76,7 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 ############################################################################## Define Constant
 NUM_CLASS = 30
 DECAY_FACTOR = 0.95
-MIN_LR = 1.5e-6
+MIN_LR = 2e-6
 # UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
 #                   1, 2, 2, 4, 1, 2, \
 #                   4, 4, 4, 4, 1, 2, \
@@ -84,8 +84,8 @@ MIN_LR = 1.5e-6
 #                   2, 1, 1, 2, 1, 2]
 
 UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, \
-                     1, 1, 1, 2, 1, 1, \
-                     2, 2, 2, 2, 1, 1, \
+                     1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 1, 1, 1, \
                      1, 1, 1, 1, 1, 1, \
                      1, 1, 1, 1, 1, 1]
 
@@ -193,6 +193,8 @@ def training(
     ############################################################################### model
     if model_type == "bert":
         model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
+    elif model_type == "xlnet":
+        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
     else:
         raise NotImplementedError
     
@@ -202,10 +204,7 @@ def training(
         load(model, checkpoint_filepath)
 
     ############################################################################### optimizer
-    if (model_type == "bert") and \
-        ((model_name == "bert-base-uncased") \
-         or (model_name == "bert-large-uncased") \
-         or (model_name == "bert-base-cased")):
+    if ((model_type == "bert") or (model_type == "xlnet")) :
         
         optimizer_grouped_parameters = []
         list_lr = []
@@ -590,7 +589,7 @@ if __name__ == "__main__":
     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(args.fold, args.seed)
     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(args.fold, args.seed)
 
-    if args.model_type == "bert":
+    if ((args.model_type == "bert") or (args.model_type == "xlnet")):
         train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
                                                     val_data_path=val_data_path, \
                                                     model_type=args.model_name, \

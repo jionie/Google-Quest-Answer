@@ -105,9 +105,10 @@ class QuestDataset(torch.utils.data.Dataset):
             raise NotImplementedError
             
         self.augment = augment
-        self.translation_title_rate = 0.5
-        self.translation_body_rate = 0.5
-        self.translation_answer_rate = 0.5
+        self.translation_title_rate = 0.4
+        self.translation_body_rate = 0.4
+        self.translation_answer_rate = 0.4
+        self.translation_single_language = 0.25
         self.random_select_date = 0.1
 
     def __getitem__(self, index):
@@ -265,7 +266,7 @@ class QuestDataset(torch.utils.data.Dataset):
         if self.augment:
             
             if random.random() < self.translation_title_rate:
-                if random.random() < 0.25:
+                if random.random() < self.translation_single_language:
                     title = row.t_aug
                 else:
                     if random.random() < 1/3:
@@ -282,7 +283,7 @@ class QuestDataset(torch.utils.data.Dataset):
                     title = row.question_title
                 
             if random.random() < self.translation_body_rate:
-                if random.random() < 0.25:
+                if random.random() < self.translation_single_language:
                     question = row.q_aug
                 else:
                     if random.random() < 1/3:
@@ -299,7 +300,7 @@ class QuestDataset(torch.utils.data.Dataset):
                     question = row.question_body
                 
             if random.random() < self.translation_answer_rate:
-                if random.random() < 0.25:
+                if random.random() < self.translation_single_language:
                     answer = row.a_aug
                 else:
                     if random.random() < 1/3:
@@ -320,7 +321,24 @@ class QuestDataset(torch.utils.data.Dataset):
         else:
             t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer)
 
-        tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+        if ((self.model_type == "bert-base-uncased") \
+            or (self.model_type == "bert-base-cased") \
+            or (self.model_type == "bert-large-uncased") \
+            or (self.model_type == "bert-large-cased")):
+            
+            tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            
+        elif ((self.model_type == "xlnet-base-cased") \
+            or (self.model_type == "xlnet-large-cased")):
+            
+            tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            # tokens = t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            # tokens =  t_tokens + q_tokens + a_tokens + ['[SEP]'] + ['[CLS]']
+            
+        else:
+            
+            raise NotImplementedError
+        
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
         if len(token_ids) < MAX_LEN:
             token_ids += [0] * (MAX_LEN - len(token_ids))
