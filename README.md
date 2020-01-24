@@ -24,3 +24,9 @@ Please check codes for Training, you should change the path first then run:
 ```bash
 ./bert-uncased-k-fold.sh
 ```
+
+## Codes for Getting oof
+Please check codes for oof, you should change the path first then run:
+```bash
+./oof-bert-uncased-k-fold.sh
+```

@@ -568,6 +568,10 @@ def training(
 
             valid_metric_optimal = val_metric_epoch
             torch.save(model.state_dict(), checkpoint_filepath)
+        
+            np.savez_compressed(checkpoint_folder + '/probability_label_fold_' + str(fold) + '.uint8.npz', labels_val)
+            np.savez_compressed(checkpoint_folder + '/probability_pred_fold_' + str(fold) + '.uint8.npz', pred_val)
+    
 
 
 if __name__ == "__main__":
