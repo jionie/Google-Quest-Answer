@@ -238,6 +238,9 @@ def generate_oof_files(train_data_folder, \
 
 
 def get_spearman(train_df, oof_df, checkpoint_folder):
+    
+    oof_df = postprocessing(oof_df)
+
     spearman = Spearman(train_df[TARGET_COLUMNS].values, oof_df[TARGET_COLUMNS].values)
     
     log = Logger()
@@ -247,6 +250,12 @@ def get_spearman(train_df, oof_df, checkpoint_folder):
     log.write('\n')
     
     return
+
+def postprocessing(oof_df):
+    oof_values = oof_df[TARGET_COLUMNS].values
+    oof_values = np.round(oof_values * 90) / 90
+    oof_df[TARGET_COLUMNS] = oof_values
+    return oof_df
 
 if __name__ == "__main__":
 
