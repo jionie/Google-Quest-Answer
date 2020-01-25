@@ -9,6 +9,7 @@ import argparse
 import pandas as pd
 import numpy as np
 from functools import partial
+from sklearn.preprocessing import MinMaxScaler
 
 # import pytorch related libraries
 import torch
@@ -57,7 +58,7 @@ parser.add_argument('--loss', type=str, default="bce", required=True, help="spec
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
 parser.add_argument("--valid_batch_size", type=int, default=32, required=False, help="specify the batch size for validating")
 parser.add_argument('--num_workers', type=int, default=2, \
-    required=False, help='specify the num_workers for testing dataloader')
+    required=False, help='specify the num_workers for oof_dfing dataloader')
 parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model", \
     required=False, help="specify the folder for checkpoint")
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
@@ -107,7 +108,7 @@ def seed_everything(seed=42):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.benchmark     = False  ##uses the inbuilt cudnn auto-tuner to find the fastest convolution algorithms. -
+    torch.backends.cudnn.benchmark     = False  ##uses the inbuilt cudnn auto-tuner to find the fasoof_df convolution algorithms. -
     torch.backends.cudnn.enabled       = True
     torch.backends.cudnn.deterministic = True
 
@@ -252,9 +253,127 @@ def get_spearman(train_df, oof_df, checkpoint_folder):
     return
 
 def postprocessing(oof_df):
+    
+    scaler = MinMaxScaler()
+    
+    # type 1 column [0, 0.333333, 0.5, 0.666667, 1]
+    # type 2 column [0, 0.333333, 0.666667]
+    # type 3 column [0.333333, 0.444444, 0.5, 0.555556, 0.666667, 0.777778, 0.8333333, 0.888889, 1]
+    # type 4 column [0.200000, 0.266667, 0.300000, 0.333333, 0.400000, \
+    # 0.466667, 0.5, 0.533333, 0.600000, 0.666667, 0.700000, \
+    # 0.733333, 0.800000, 0.866667, 0.900000, 0.933333, 1]
+    
+    
+    ################################################# handle type 1 columns
+    type_one_column_list = [
+       'question_conversational', \
+    #    'question_expect_short_answer', \
+    #    'question_fact_seeking', \
+       'question_has_commonly_accepted_answer', \
+    #    'question_multi_intent', \
+       'question_not_really_a_question', \
+       'question_type_choice', \
+       'question_type_compare', \
+       'question_type_consequence', \
+       'question_type_definition', \
+       'question_type_entity', \
+       'question_type_instructions', \
+    #    'question_type_procedure', \
+    #    'question_type_reason_explanation', \
+    #    'answer_type_instructions'
+    #    'answer_type_procedure', \
+    #    'answer_type_reason_explanation', \
+    ]
+    
+    oof_df[type_one_column_list] = scaler.fit_transform(oof_df[type_one_column_list])
+    
+    for column in type_one_column_list:
+        
+        oof_df.loc[oof_df[column] <= 0.16667, column] = 0
+        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667), column] = 0.333333
+        oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333), column] = 0.500000
+        oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.73333), column] = 0.666667
+        oof_df.loc[(oof_df[column] > 0.73333), column] = 1
+    
+    
+    
+    ################################################# handle type 2 columns      
+    type_two_column_list = [
+        'question_type_spelling'
+    ]
+    
+    oof_df[type_two_column_list] = scaler.fit_transform(oof_df[type_two_column_list])
+    
+    for column in type_two_column_list:
+        oof_df.loc[oof_df[column] <= 0.16667, column] = 0
+        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5), column] = 0.333333
+        oof_df.loc[(oof_df[column] > 0.5), column] = 0.666667
+    
+    
+    
+    ################################################# handle type 3 columns      
+    type_three_column_list = [
+    #    'question_asker_intent_understanding', \
+    #    'question_body_critical', \
+    #    'question_interestingness_others', \
+    #    'question_has_commonly_accepted_answer', \
+       'question_interestingness_self', \
+    #    'question_well_written', \
+    #    'answer_helpful', \
+    #    'answer_level_of_information', \
+    #    'answer_plausible', \
+    #    'answer_relevance', \
+    #    'answer_well_written'
+    ]
+
+    oof_df[type_three_column_list] = scaler.fit_transform(oof_df[type_three_column_list])
+    
+    for column in type_three_column_list:
+        oof_df.loc[oof_df[column] <= 0.385, column] = 0.333333
+        oof_df.loc[(oof_df[column] > 0.385) & (oof_df[column] <= 0.47), column] = 0.444444
+        oof_df.loc[(oof_df[column] > 0.47) & (oof_df[column] <= 0.525), column] = 0.5
+        oof_df.loc[(oof_df[column] > 0.525) & (oof_df[column] <= 0.605), column] = 0.555556
+        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = 0.666667
+        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = 0.777778
+        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.8), column] = 0.833333
+        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.94), column] = 0.888889
+        oof_df.loc[(oof_df[column] > 0.94), column] = 1
+        
+        
+        
+    ################################################# handle type 4 columns      
+    type_four_column_list = [
+        'answer_satisfaction'
+    ]
+    
+    oof_df[type_four_column_list] = scaler.fit_transform(oof_df[type_four_column_list])
+    
+    for column in type_four_column_list:
+        
+        oof_df.loc[oof_df[column] <= 0.233, column] = 0.200000
+        oof_df.loc[(oof_df[column] > 0.233) & (oof_df[column] <= 0.283), column] = 0.266667
+        oof_df.loc[(oof_df[column] > 0.283) & (oof_df[column] <= 0.315), column] = 0.300000
+        oof_df.loc[(oof_df[column] > 0.315) & (oof_df[column] <= 0.365), column] = 0.333333
+        oof_df.loc[(oof_df[column] > 0.365) & (oof_df[column] <= 0.433), column] = 0.400000
+        oof_df.loc[(oof_df[column] > 0.433) & (oof_df[column] <= 0.483), column] = 0.466667
+        oof_df.loc[(oof_df[column] > 0.483) & (oof_df[column] <= 0.517), column] = 0.500000
+        oof_df.loc[(oof_df[column] > 0.517) & (oof_df[column] <= 0.567), column] = 0.533333
+        oof_df.loc[(oof_df[column] > 0.567) & (oof_df[column] <= 0.633), column] = 0.600000
+        oof_df.loc[(oof_df[column] > 0.633) & (oof_df[column] <= 0.683), column] = 0.666667
+        oof_df.loc[(oof_df[column] > 0.683) & (oof_df[column] <= 0.715), column] = 0.700000
+        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.767), column] = 0.733333
+        oof_df.loc[(oof_df[column] > 0.767) & (oof_df[column] <= 0.833), column] = 0.800000
+        oof_df.loc[(oof_df[column] > 0.833) & (oof_df[column] <= 0.883), column] = 0.866667
+        oof_df.loc[(oof_df[column] > 0.883) & (oof_df[column] <= 0.915), column] = 0.900000
+        oof_df.loc[(oof_df[column] > 0.915) & (oof_df[column] <= 0.967), column] = 0.933333
+        oof_df.loc[(oof_df[column] > 0.967), column] = 1
+    
+    
+    ################################################# round to i / 90 (i from 0 to 90)
     oof_values = oof_df[TARGET_COLUMNS].values
-    oof_values = np.round(oof_values * 90) / 90
+    oof_values = np.around(oof_values * 90) / 90
     oof_df[TARGET_COLUMNS] = oof_values
+    
     return oof_df
 
 if __name__ == "__main__":
