@@ -109,9 +109,12 @@ class QuestDataset(torch.utils.data.Dataset):
         else:
             
             raise NotImplementedError
-            
+
         self.augment = augment
-        self.translation_rate = 0.3
+        self.translation_title_rate = 0.4
+        self.translation_body_rate = 0.4
+        self.translation_answer_rate = 0.4
+        self.translation_single_language = 0.25
         self.random_select_date = 0.1
 
     def __getitem__(self, index):
@@ -119,7 +122,6 @@ class QuestDataset(torch.utils.data.Dataset):
         token_ids, seg_ids = self.get_token_ids(row, index)
         if self.labeled:
             labels = self.get_label(row)
-            # print(labels)
             return token_ids, seg_ids, labels
         else:
             return token_ids, seg_ids
@@ -128,14 +130,18 @@ class QuestDataset(torch.utils.data.Dataset):
         return len(self.df)
 
     def augmentation(self, text, insert=False, substitute=False, swap=True, delete=True):
+
+        augs = []
+
         if insert:
             # aug = naw.ContextualWordEmbsAug(
             #     model_path=self.model_type, action="insert", device='cuda')
             aug = naw.WordEmbsAug(
-                model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
+                model_type='word2vec',
+                model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
                 action="insert")
-            text = aug.augment(text)
-        
+            augs.append(aug)
+
         if substitute:
             # aug = naw.ContextualWordEmbsAug(
             #     model_path=self.model_type, action="substitute", device='cuda')
@@ -143,17 +149,20 @@ class QuestDataset(torch.utils.data.Dataset):
             #     model_type='word2vec', model_path='/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model/word2vec/GoogleNews-vectors-negative300.bin',
             #     action="substitute")
             aug_sub = naw.SynonymAug(aug_src='wordnet')
+            augs.append(aug_sub)
             # text = aug.augment(text)
 
         if swap:
             aug_swap = naw.RandomWordAug(action="swap")
+            augs.append(aug_swap)
             # text = aug.augment(text)
 
         if delete:
             aug_del = naw.RandomWordAug()
+            augs.append(aug_del)
             # text = aug.augment(text)
-            
-        aug = naf.Sometimes([aug_sub, aug_del], aug_p=0.5, pipeline_p=0.5)
+
+        aug = naf.Sometimes(augs, aug_p=0.5, pipeline_p=0.5)
         # print("before aug:", text)
         text = aug.augment(text, n=1)
         # print("after aug:", text)
@@ -170,16 +179,16 @@ class QuestDataset(torch.utils.data.Dataset):
         else:
             return tokens[:max_num//2] + tokens[-(max_num - max_num//2):]
 
-    def trim_input(self, title, question, answer, max_sequence_length=MAX_LEN, 
-                t_max_len=30, q_max_len=239, a_max_len=239):
+    def trim_input(self, title, question, answer, max_sequence_length=MAX_LEN,
+                   t_max_len=30, q_max_len=239, a_max_len=239):
 
         if self.augment:
-#             print("title: ", title)
-            title = self.augmentation(title, insert=False, substitute=True, swap=True, delete=True)
-#             print("question: ", question)
-            question = self.augmentation(question, insert=False, substitute=True, swap=True, delete=True)
-#             print("answer: ", answer)
-            answer = self.augmentation(answer, insert=False, substitute=True, swap=True, delete=True)
+            # print("title: ", title)
+            title = self.augmentation(title, insert=False, substitute=True, swap=False, delete=True)
+            # print("question: ", question)
+            question = self.augmentation(question, insert=False, substitute=True, swap=False, delete=True)
+            # print("answer: ", answer)
+            answer = self.augmentation(answer, insert=False, substitute=True, swap=False, delete=True)
 
         t = self.tokenizer.tokenize(title)
         q = self.tokenizer.tokenize(question)
@@ -189,17 +198,17 @@ class QuestDataset(torch.utils.data.Dataset):
         q_len = len(q)
         a_len = len(a)
 
-        if (t_len+q_len+a_len+4) > max_sequence_length:
+        if (t_len + q_len + a_len + 4) > max_sequence_length:
 
             if t_max_len > t_len:
                 t_new_len = t_len
-                a_max_len = a_max_len + floor((t_max_len - t_len)/2)
-                q_max_len = q_max_len + ceil((t_max_len - t_len)/2)
+                a_max_len = a_max_len + floor((t_max_len - t_len) / 2)
+                q_max_len = q_max_len + ceil((t_max_len - t_len) / 2)
             else:
                 t_new_len = t_max_len
 
             if a_max_len > a_len:
-                a_new_len = a_len 
+                a_new_len = a_len
                 q_new_len = q_max_len + (a_max_len - a_len)
             elif q_max_len > q_len:
                 a_new_len = a_max_len + (q_max_len - q_len)
@@ -208,10 +217,9 @@ class QuestDataset(torch.utils.data.Dataset):
                 a_new_len = a_max_len
                 q_new_len = q_max_len
 
-
-            if t_new_len+a_new_len+q_new_len+4 != max_sequence_length:
-                raise ValueError("New sequence length should be %d, but is %d" 
-                                 % (max_sequence_length, (t_new_len+a_new_len+q_new_len+4)))
+            if t_new_len + a_new_len + q_new_len + 4 != max_sequence_length:
+                raise ValueError("New sequence length should be %d, but is %d"
+                                 % (max_sequence_length, (t_new_len + a_new_len + q_new_len + 4)))
 
             if self.augment:
                 # random select
@@ -231,67 +239,120 @@ class QuestDataset(torch.utils.data.Dataset):
                     else:
                         a_start = 0
 
-                    t = t[t_start : (t_start + t_new_len)]
-                    q = q[q_start : (q_start + q_new_len)]
-                    a = a[a_start : (a_start + a_new_len)]
-                    
+                    t = t[t_start: (t_start + t_new_len)]
+                    q = q[q_start: (q_start + q_new_len)]
+                    a = a[a_start: (a_start + a_new_len)]
+
                 else:
                     # truncate
                     if len(t) - t_new_len > 0:
-                        t = t[:t_new_len//4] + t[len(t)-t_new_len+t_new_len//4:]
+                        t = t[:t_new_len // 4] + t[len(t) - t_new_len + t_new_len // 4:]
                     else:
                         t = t[:t_new_len]
 
                     if len(q) - q_new_len > 0:
-                        q = q[:q_new_len//4] + q[len(q)-q_new_len+q_new_len//4:]
+                        q = q[:q_new_len // 4] + q[len(q) - q_new_len + q_new_len // 4:]
                     else:
                         q = q[:q_new_len]
 
                     if len(a) - a_new_len > 0:
-                        a = a[:a_new_len//4] + a[len(a)-a_new_len+a_new_len//4:]
+                        a = a[:a_new_len // 4] + a[len(a) - a_new_len + a_new_len // 4:]
                     else:
                         a = a[:a_new_len]
-                        
+
             else:
-    
+
                 t = t[:t_new_len]
                 q = q[:q_new_len]
                 a = a[:a_new_len]
 
         return t, q, a
-        
+
     def get_token_ids(self, row, index):
-        
         if self.augment:
-            
-            if random.random() < self.translation_rate:
-                title = row.t_aug
+
+            if random.random() < self.translation_title_rate:
+                if random.random() < self.translation_single_language:
+                    title = row.t_aug
+                else:
+                    if random.random() < 1 / 3:
+                        title = row.t_chinese
+                    elif random.random() < 2 / 3:
+                        title = row.t_french
+                    else:
+                        title = row.t_german
             else:
                 title = row.question_title
-                
-            if random.random() < self.translation_rate:
-                question = row.q_aug
+
+            if not isinstance(title, str):
+                if np.isnan(title):
+                    title = row.question_title
+
+            if random.random() < self.translation_body_rate:
+                if random.random() < self.translation_single_language:
+                    question = row.q_aug
+                else:
+                    if random.random() < 1 / 3:
+                        question = row.b_chinese
+                    elif random.random() < 2 / 3:
+                        question = row.b_french
+                    else:
+                        question = row.b_german
             else:
                 question = row.question_body
-                
-            if random.random() < self.translation_rate:
-                answer = row.a_aug
+
+            if not isinstance(question, str):
+                if np.isnan(question):
+                    question = row.question_body
+
+            if random.random() < self.translation_answer_rate:
+                if random.random() < self.translation_single_language:
+                    answer = row.a_aug
+                else:
+                    if random.random() < 1 / 3:
+                        answer = row.a_chinese
+                    elif random.random() < 2 / 3:
+                        answer = row.a_french
+                    else:
+                        answer = row.a_german
             else:
                 answer = row.answer
-                
+
+            if not isinstance(answer, str):
+                if np.isnan(answer):
+                    answer = row.answer
+
             t_tokens, q_tokens, a_tokens = self.trim_input(title, question, answer)
-            
+
         else:
             t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer)
 
-        tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+        if ((self.model_type == "bert-base-uncased") \
+                or (self.model_type == "bert-base-cased") \
+                or (self.model_type == "bert-large-uncased") \
+                or (self.model_type == "bert-large-cased")):
+
+            tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+
+        elif ((self.model_type == "xlnet-base-cased") \
+              or (self.model_type == "xlnet-large-cased")):
+
+            tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            # tokens = t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            # tokens =  t_tokens + q_tokens + a_tokens + ['[SEP]'] + ['[CLS]']
+        elif (self.model_type == "albert-base-v2"):
+            tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+        else:
+
+            raise NotImplementedError
+
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
         if len(token_ids) < MAX_LEN:
             token_ids += [0] * (MAX_LEN - len(token_ids))
         ids = torch.tensor(token_ids)
         seg_ids = self.get_seg_ids(ids)
         return ids, seg_ids
-    
+
     def get_seg_ids(self, ids):
         seg_ids = torch.zeros_like(ids)
         seg_idx = 0
@@ -309,13 +370,13 @@ class QuestDataset(torch.utils.data.Dataset):
         return seg_ids
 
     def get_label(self, row):
-        #print(row[TARGET_COLUMNS].values)
+        # print(row[TARGET_COLUMNS].values)
         return torch.tensor(row[TARGET_COLUMNS].values.astype(np.float32))
 
     def collate_fn(self, batch):
         token_ids = torch.stack([x[0] for x in batch])
         seg_ids = torch.stack([x[1] for x in batch])
-    
+
         if self.labeled:
             labels = torch.stack([x[2] for x in batch])
             return token_ids, seg_ids, labels
@@ -343,15 +404,14 @@ def get_train_val_split(data_path="/home/leon/Leon/Kaggle/Google/Google-Quest-An
     gkf = GroupKFold(n_splits=n_splits).split(X=df.question_body, groups=df.question_body)
 
     for fold, (train_idx, valid_idx) in enumerate(gkf):
-        
         df_train = df.iloc[train_idx]
         df_val = df.iloc[valid_idx]
 
-        df_train.to_csv(save_path + '/split/train_fold_%s_seed_%s.csv'%(fold, seed))
-        df_val.to_csv(save_path + '/split/val_fold_%s_seed_%s.csv'%(fold, seed))
+        df_train.to_csv(save_path + '/split/train_fold_%s_seed_%s.csv' % (fold, seed))
+        df_val.to_csv(save_path + '/split/val_fold_%s_seed_%s.csv' % (fold, seed))
 
-    return 
-    
+    return
+
 
 def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                         val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \

@@ -36,6 +36,7 @@ from utils.lrs_scheduler import *
 from utils.loss_function import *
 from utils.metric import *
 from utils.file import *
+from utils.functions import get_optimizer_params
 
 # import model
 from model.model_bert import *
@@ -43,13 +44,11 @@ from model.model_bert import *
 
 ############################################################################## Define Argument
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument("--train_data_folder", type=str, default="/home/leon/Leon/Kaggle/Google/Google-Quest-Answer/input/google-quest-challenge/", \
+parser.add_argument("--train_data_folder", type=str, default="/home/leon/Leon/Kaggle/Google/Google_Quest_Answer/Google-Quest-Answer/input/google-quest-challenge/", \
     required=False, help="specify the folder for training data")
-parser.add_argument('--model_type', type=str, default="bert", \
-    required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
+parser.add_argument('--hidden_layers', type=list, default=[-2, -4, -6, -8, -10], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -97,7 +96,6 @@ def training(
             fold,
             train_data_loader, 
             val_data_loader,
-            model_type,
             model_name,
             hidden_layers, 
             optimizer_name,
@@ -137,10 +135,10 @@ def training(
     COMMON_STRING += '\n'
     
     if augment:
-        checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+        checkpoint_folder = os.path.join(checkpoint_folder, model_name + '-' + loss + '-' + \
             optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_relu/')
     else:
-        checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+        checkpoint_folder = os.path.join(checkpoint_folder, model_name + '-' + loss + '-' + \
             optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '/')
 
     checkpoint_filename = 'fold_' + str(fold) + "_checkpoint.pth"
@@ -177,24 +175,26 @@ def training(
 
 
     ############################################################################### model
-    if model_type == "bert":
-        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
-    else:
-        raise NotImplementedError
-    
+    model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
+
     model = model.cuda()
-    
+    print('*********///////***************')
+    # params = list(model.albert_model.named_parameters())
+    # for p in params:
+    #     print("{:<55} {:>12}".format(p[0], str(tuple(p[1].size()))))
+    # print(model.albert_model.encoder.albert_layer_groups[0].albert_layers)
     if load_pretrain:
         load(model, checkpoint_filepath)
 
     ############################################################################### optimizer
-    if (model_type == "bert") and \
-        ((model_name == "bert-base-uncased") \
-         or (model_name == "bert-large-uncased") \
-         or (model_name == "bert-base-cased")):
+    if ((model_name == "bert-base-uncased")
+            or (model_name == "bert-large-uncased")
+            or (model_name == "bert-base-cased")
+            or (model_name == "albert-base-v2")
+            or (model_name == "gpt2")
+    ):
         
         optimizer_grouped_parameters = []
-        list_lr = []
         
         if ((model_name == "bert-base-uncased") or (model_name == "bert-base-cased")):
             
@@ -315,41 +315,47 @@ def training(
                       ]
         elif (model_name == "albert-base-v2"):
             
-            list_layers = [model.albert_model.word_embedding,
-                      model.albert_model.layer[0],
-                      model.albert_model.layer[1],
-                      model.albert_model.layer[2],
-                      model.albert_model.layer[3],
-                      model.albert_model.layer[4],
-                      model.albert_model.layer[5],
-                      model.albert_model.layer[6],
-                      model.albert_model.layer[7],
-                      model.albert_model.layer[8],
-                      model.albert_model.layer[9],
-                      model.albert_model.layer[10],
-                      model.albert_model.layer[11],
-                      model.fc_1,
-                      model.fc
-                      ]
-                      
+            # list_layers = [model.albert_model.embeddings,
+            #           model.albert_model.encoder.layer[0],
+            #           model.albert_model.encoder.layer[1],
+            #           model.albert_model.encoder.layer[2],
+            #           model.albert_model.encoder.layer[3],
+            #           model.albert_model.encoder.layer[4],
+            #           model.albert_model.encoder.layer[5],
+            #           model.albert_model.encoder.layer[6],
+            #           model.albert_model.encoder.layer[7],
+            #           model.albert_model.encoder.layer[8],
+            #           model.albert_model.encoder.layer[9],
+            #           model.albert_model.encoder.layer[10],
+            #           model.albert_model.encoder.layer[11],
+            #           model.fc_1,
+            #           model.fc
+            #           ]
+            list_layers = [model.albert_model.embeddings,
+                           model.albert_model.encoder,
+                           model.fc_1,
+                           model.fc
+                           ]
+
         elif (model_name == "gpt2"):
-            
-            list_layers = [model.gpt2_model.word_embedding,
-                      model.gpt2_model.layer[0],
-                      model.gpt2_model.layer[1],
-                      model.gpt2_model.layer[2],
-                      model.gpt2_model.layer[3],
-                      model.gpt2_model.layer[4],
-                      model.gpt2_model.layer[5],
-                      model.gpt2_model.layer[6],
-                      model.gpt2_model.layer[7],
-                      model.gpt2_model.layer[8],
-                      model.gpt2_model.layer[9],
-                      model.gpt2_model.layer[10],
-                      model.gpt2_model.layer[11],
-                      model.fc_1,
-                      model.fc
-                      ]
+            list_layers = [# model.gpt2_model.wte,
+                           # model.gpt2_model.wpe,
+                           model.gpt2_model.h[0],
+                           model.gpt2_model.h[1],
+                           model.gpt2_model.h[2],
+                           model.gpt2_model.h[3],
+                           model.gpt2_model.h[4],
+                           model.gpt2_model.h[5],
+                           model.gpt2_model.h[6],
+                           model.gpt2_model.h[7],
+                           model.gpt2_model.h[8],
+                           model.gpt2_model.h[9],
+                           model.gpt2_model.h[10],
+                           model.gpt2_model.h[11],
+                           model.fc_1,
+                           model.fc
+                           ]
+
         else:
             raise NotImplementedError
 
@@ -364,7 +370,7 @@ def training(
         mult = lr / MIN_LR
         step = mult**(1/(len(list_layers)-1))
         list_lr = [MIN_LR * (step ** i) for i in range(len(list_layers))]
-        
+
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             
             
@@ -380,10 +386,10 @@ def training(
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
                 'lr': list_lr[i], \
-                'weight_decay': 0.0}) 
-            
+                'weight_decay': 0.0})
+
         print("Differential Learning Rate!!")
-    
+
     else:
         param_optimizer = list(model.named_parameters())
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
@@ -395,6 +401,7 @@ def training(
              'lr': lr, \
              'weight_decay': 0.0}
         ]
+
 
     if optimizer_name == "Adam":
         optimizer = torch.optim.Adam(optimizer_grouped_parameters)
@@ -464,7 +471,9 @@ def training(
         criterion = FocalLoss()
     else:
         raise NotImplementedError
-    
+
+
+
     for epoch in range(1, num_epoch+1):
 
         # init in-epoch statistics
@@ -489,7 +498,7 @@ def training(
         # init optimizer
         torch.cuda.empty_cache()
         model.zero_grad()
-        
+
         for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
             
             rate = 0
@@ -620,7 +629,7 @@ if __name__ == "__main__":
     seed_everything(args.seed)
 
     # get train val split
-    data_path = args.train_data_folder + "train_augment_clean.csv"
+    data_path = args.train_data_folder + "train_augment_final_with_clean.csv"
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
@@ -630,23 +639,19 @@ if __name__ == "__main__":
     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(args.fold, args.seed)
     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(args.fold, args.seed)
 
-    if args.model_type == "bert":
-        train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
-                                                    val_data_path=val_data_path, \
-                                                    model_type=args.model_name, \
-                                                    batch_size=args.batch_size, \
-                                                    val_batch_size=args.valid_batch_size, \
-                                                    num_workers=args.num_workers, \
-                                                    augment=args.augment)
-    else:
-        raise NotImplementedError
+    train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+                                                val_data_path=val_data_path, \
+                                                model_type=args.model_name, \
+                                                batch_size=args.batch_size, \
+                                                val_batch_size=args.valid_batch_size, \
+                                                num_workers=args.num_workers, \
+                                                augment=args.augment)
 
     # start training
     training(args.n_splits, \
             args.fold, \
             train_data_loader, \
             val_data_loader, \
-            args.model_type, \
             args.model_name, \
             args.hidden_layers, \
             args.optimizer, \
