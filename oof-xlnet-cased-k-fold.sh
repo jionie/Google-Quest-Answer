@@ -1,1 +1,1 @@
-python oof-k-fold.py --model_type "xlnet" --model_name "xlnet-base-cased" --seed 323323 --n_splits 10 --valid_batch_size 32 --loss "bce" --augment --num_workers 4
+python oof-k-fold.py --model_type "xlnet" --model_name "xlnet-base-cased" --seed 1997 --n_splits 5 --valid_batch_size 32 --loss "bce" --augment --num_workers 4

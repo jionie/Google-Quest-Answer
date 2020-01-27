@@ -42,7 +42,7 @@ parser.add_argument('--model_type', type=str, default="bert-base-uncased", \
 
 ############################################ Define Dataset Contants
 
-MAX_LEN = 512
+MAX_LEN = 768
 #MAX_Q_LEN = 250
 #MAX_A_LEN = 259
 SEP_TOKEN_ID = 102
@@ -105,9 +105,9 @@ class QuestDataset(torch.utils.data.Dataset):
             raise NotImplementedError
             
         self.augment = augment
-        self.translation_title_rate = 0.4
-        self.translation_body_rate = 0.4
-        self.translation_answer_rate = 0.4
+        self.translation_title_rate = 0.5
+        self.translation_body_rate = 0.5
+        self.translation_answer_rate = 0.5
         self.translation_single_language = 0.25
         self.random_select_date = 0.1
 
@@ -173,7 +173,7 @@ class QuestDataset(torch.utils.data.Dataset):
             return tokens[:max_num//2] + tokens[-(max_num - max_num//2):]
 
     def trim_input(self, title, question, answer, max_sequence_length=MAX_LEN, 
-                t_max_len=30, q_max_len=239, a_max_len=239):
+                t_max_len=30, q_max_len=int((MAX_LEN-30-4)/2), a_max_len=(MAX_LEN-30-4 - int((MAX_LEN-30-4)/2))):
 
         if self.augment:
             # print("title: ", title)

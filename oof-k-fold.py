@@ -289,11 +289,13 @@ def postprocessing(oof_df):
     
     for column in type_one_column_list:
         
-        oof_df.loc[oof_df[column] <= 0.16667, column] = 0
-        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667), column] = 0.333333
-        oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333), column] = 0.500000
-        oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.73333), column] = 0.666667
-        oof_df.loc[(oof_df[column] > 0.73333), column] = 1
+        oof_df.loc[oof_df[column] <= 0.16667, column] = -0
+        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667), column] = -0.333333
+        oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333), column] = -0.500000
+        oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.73333), column] = -0.666667
+        oof_df.loc[(oof_df[column] > 0.73333), column] = -1
+        
+        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
     
     
     
@@ -305,9 +307,11 @@ def postprocessing(oof_df):
     oof_df[type_two_column_list] = scaler.fit_transform(oof_df[type_two_column_list])
     
     for column in type_two_column_list:
-        oof_df.loc[oof_df[column] <= 0.16667, column] = 0
-        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5), column] = 0.333333
-        oof_df.loc[(oof_df[column] > 0.5), column] = 0.666667
+        oof_df.loc[oof_df[column] <= 0.16667, column] = -0
+        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5), column] = -0.333333
+        oof_df.loc[(oof_df[column] > 0.5), column] = -0.666667
+        
+        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
     
     
     
@@ -329,16 +333,17 @@ def postprocessing(oof_df):
     oof_df[type_three_column_list] = scaler.fit_transform(oof_df[type_three_column_list])
     
     for column in type_three_column_list:
-        oof_df.loc[oof_df[column] <= 0.385, column] = 0.333333
-        oof_df.loc[(oof_df[column] > 0.385) & (oof_df[column] <= 0.47), column] = 0.444444
-        oof_df.loc[(oof_df[column] > 0.47) & (oof_df[column] <= 0.525), column] = 0.5
-        oof_df.loc[(oof_df[column] > 0.525) & (oof_df[column] <= 0.605), column] = 0.555556
-        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = 0.666667
-        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = 0.777778
-        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.8), column] = 0.833333
-        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.94), column] = 0.888889
-        oof_df.loc[(oof_df[column] > 0.94), column] = 1
+        oof_df.loc[oof_df[column] <= 0.385, column] = -0.333333
+        oof_df.loc[(oof_df[column] > 0.385) & (oof_df[column] <= 0.47), column] = -0.444444
+        oof_df.loc[(oof_df[column] > 0.47) & (oof_df[column] <= 0.525), column] = -0.5
+        oof_df.loc[(oof_df[column] > 0.525) & (oof_df[column] <= 0.605), column] = -0.555556
+        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = -0.666667
+        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = -0.777778
+        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.8), column] = -0.833333
+        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.94), column] = -0.888889
+        oof_df.loc[(oof_df[column] > 0.94), column] = -1
         
+        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
         
         
     ################################################# handle type 4 columns      
@@ -350,23 +355,25 @@ def postprocessing(oof_df):
     
     for column in type_four_column_list:
         
-        oof_df.loc[oof_df[column] <= 0.233, column] = 0.200000
-        oof_df.loc[(oof_df[column] > 0.233) & (oof_df[column] <= 0.283), column] = 0.266667
-        oof_df.loc[(oof_df[column] > 0.283) & (oof_df[column] <= 0.315), column] = 0.300000
-        oof_df.loc[(oof_df[column] > 0.315) & (oof_df[column] <= 0.365), column] = 0.333333
-        oof_df.loc[(oof_df[column] > 0.365) & (oof_df[column] <= 0.433), column] = 0.400000
-        oof_df.loc[(oof_df[column] > 0.433) & (oof_df[column] <= 0.483), column] = 0.466667
-        oof_df.loc[(oof_df[column] > 0.483) & (oof_df[column] <= 0.517), column] = 0.500000
-        oof_df.loc[(oof_df[column] > 0.517) & (oof_df[column] <= 0.567), column] = 0.533333
-        oof_df.loc[(oof_df[column] > 0.567) & (oof_df[column] <= 0.633), column] = 0.600000
-        oof_df.loc[(oof_df[column] > 0.633) & (oof_df[column] <= 0.683), column] = 0.666667
-        oof_df.loc[(oof_df[column] > 0.683) & (oof_df[column] <= 0.715), column] = 0.700000
-        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.767), column] = 0.733333
-        oof_df.loc[(oof_df[column] > 0.767) & (oof_df[column] <= 0.833), column] = 0.800000
-        oof_df.loc[(oof_df[column] > 0.833) & (oof_df[column] <= 0.883), column] = 0.866667
-        oof_df.loc[(oof_df[column] > 0.883) & (oof_df[column] <= 0.915), column] = 0.900000
-        oof_df.loc[(oof_df[column] > 0.915) & (oof_df[column] <= 0.967), column] = 0.933333
-        oof_df.loc[(oof_df[column] > 0.967), column] = 1
+        oof_df.loc[oof_df[column] <= 0.233, column] = -0.200000
+        oof_df.loc[(oof_df[column] > 0.233) & (oof_df[column] <= 0.283), column] = -0.266667
+        oof_df.loc[(oof_df[column] > 0.283) & (oof_df[column] <= 0.315), column] = -0.300000
+        oof_df.loc[(oof_df[column] > 0.315) & (oof_df[column] <= 0.365), column] = -0.333333
+        oof_df.loc[(oof_df[column] > 0.365) & (oof_df[column] <= 0.433), column] = -0.400000
+        oof_df.loc[(oof_df[column] > 0.433) & (oof_df[column] <= 0.483), column] = -0.466667
+        oof_df.loc[(oof_df[column] > 0.483) & (oof_df[column] <= 0.517), column] = -0.500000
+        oof_df.loc[(oof_df[column] > 0.517) & (oof_df[column] <= 0.567), column] = -0.533333
+        oof_df.loc[(oof_df[column] > 0.567) & (oof_df[column] <= 0.633), column] = -0.600000
+        oof_df.loc[(oof_df[column] > 0.633) & (oof_df[column] <= 0.683), column] = -0.666667
+        oof_df.loc[(oof_df[column] > 0.683) & (oof_df[column] <= 0.715), column] = -0.700000
+        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.767), column] = -0.733333
+        oof_df.loc[(oof_df[column] > 0.767) & (oof_df[column] <= 0.833), column] = -0.800000
+        oof_df.loc[(oof_df[column] > 0.833) & (oof_df[column] <= 0.883), column] = -0.866667
+        oof_df.loc[(oof_df[column] > 0.883) & (oof_df[column] <= 0.915), column] = -0.900000
+        oof_df.loc[(oof_df[column] > 0.915) & (oof_df[column] <= 0.967), column] = -0.933333
+        oof_df.loc[(oof_df[column] > 0.967), column] = -1
+        
+        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
     
     
     ################################################# round to i / 90 (i from 0 to 90)
@@ -394,33 +401,33 @@ if __name__ == "__main__":
     
     # get oof
     
-    for fold in range(args.n_splits):
+    # for fold in range(args.n_splits):
         
-        # get train_data_loader and val_data_loader
-        train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
-        val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
+    #     # get train_data_loader and val_data_loader
+    #     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
+    #     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
 
-        if ((args.model_type == "bert") or (args.model_type == "xlnet")):
-            _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
-                                                        val_data_path=val_data_path, \
-                                                        model_type=args.model_name, \
-                                                        batch_size=args.batch_size, \
-                                                        val_batch_size=args.valid_batch_size, \
-                                                        num_workers=args.num_workers, \
-                                                        augment=args.augment)
-        else:
-            raise NotImplementedError
+    #     if ((args.model_type == "bert") or (args.model_type == "xlnet")):
+    #         _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+    #                                                     val_data_path=val_data_path, \
+    #                                                     model_type=args.model_name, \
+    #                                                     batch_size=args.batch_size, \
+    #                                                     val_batch_size=args.valid_batch_size, \
+    #                                                     num_workers=args.num_workers, \
+    #                                                     augment=args.augment)
+    #     else:
+    #         raise NotImplementedError
 
     
-        get_oof(args.n_splits, \
-                fold, \
-                val_data_loader, \
-                args.model_type, \
-                args.model_name, \
-                args.hidden_layers, \
-                args.valid_batch_size, \
-                checkpoint_folder, \
-                args.seed)
+    #     get_oof(args.n_splits, \
+    #             fold, \
+    #             val_data_loader, \
+    #             args.model_type, \
+    #             args.model_name, \
+    #             args.hidden_layers, \
+    #             args.valid_batch_size, \
+    #             checkpoint_folder, \
+    #             args.seed)
     
     generate_oof_files(args.train_data_folder, \
                        args.n_splits, \

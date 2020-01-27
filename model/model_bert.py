@@ -25,10 +25,10 @@ class QuestNet(nn.Module):
                                                     output_hidden_states=True, force_download=True)   
             self.hidden_size = 768
         elif model_type == "xlnet-base-cased":
-            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.1, output_hidden_states=True)   
+            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.0, output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "xlnet-large-cased":
-            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.1, output_hidden_states=True)   
+            self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0.0, output_hidden_states=True)   
             self.hidden_size = 1024
         else:
             raise NotImplementedError
