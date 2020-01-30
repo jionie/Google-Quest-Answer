@@ -137,6 +137,15 @@ def get_oof(
         pretrain_state_dict = torch.load(pretrain_file)
         state_dict = model.state_dict()
         keys = list(state_dict.keys())
+        
+        # for model trained with dataparallel
+        # from collections import OrderedDict
+        # new_state_dict = OrderedDict()
+        # for k, v in pretrain_state_dict.items():
+        #     name = k[7:] # remove `module.`
+        #     new_state_dict[name] = v
+        # pretrain_state_dict = new_state_dict
+                
         for key in keys:
             if any(s in key for s in skip): continue
             try:
@@ -157,7 +166,7 @@ def get_oof(
         raise NotImplementedError
     
     model = model.cuda()
-    load(model, checkpoint_filepath)
+    model = load(model, checkpoint_filepath)
 
     
     # init statistics
@@ -401,33 +410,34 @@ if __name__ == "__main__":
     
     # get oof
     
-    # for fold in range(args.n_splits):
+    for fold in range(args.n_splits):
         
-    #     # get train_data_loader and val_data_loader
-    #     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
-    #     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
+        # get train_data_loader and val_data_loader
+        train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
+        val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
 
-    #     if ((args.model_type == "bert") or (args.model_type == "xlnet")):
-    #         _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
-    #                                                     val_data_path=val_data_path, \
-    #                                                     model_type=args.model_name, \
-    #                                                     batch_size=args.batch_size, \
-    #                                                     val_batch_size=args.valid_batch_size, \
-    #                                                     num_workers=args.num_workers, \
-    #                                                     augment=args.augment)
-    #     else:
-    #         raise NotImplementedError
+        if ((args.model_type == "bert") or (args.model_type == "xlnet")):
+            _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+                                                        val_data_path=val_data_path, \
+                                                        model_type=args.model_name, \
+                                                        batch_size=args.batch_size, \
+                                                        val_batch_size=args.valid_batch_size, \
+                                                        num_workers=args.num_workers, \
+                                                        augment=args.augment, \
+                                                        extra_token=False)
+        else:
+            raise NotImplementedError
 
     
-    #     get_oof(args.n_splits, \
-    #             fold, \
-    #             val_data_loader, \
-    #             args.model_type, \
-    #             args.model_name, \
-    #             args.hidden_layers, \
-    #             args.valid_batch_size, \
-    #             checkpoint_folder, \
-    #             args.seed)
+        get_oof(args.n_splits, \
+                fold, \
+                val_data_loader, \
+                args.model_type, \
+                args.model_name, \
+                args.hidden_layers, \
+                args.valid_batch_size, \
+                checkpoint_folder, \
+                args.seed)
     
     generate_oof_files(args.train_data_folder, \
                        args.n_splits, \

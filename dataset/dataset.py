@@ -13,12 +13,13 @@ import nlpaug.augmenter.word as naw
 import nlpaug.augmenter.sentence as nas
 import nlpaug.augmenter.char as nac
 import nlpaug.flow as naf
+from sklearn.preprocessing import LabelBinarizer
 
 
 ############################################ Define augments for test
 
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument('-data_path', type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train_augment.csv", \
+parser.add_argument('-data_path', type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train_augment_final_with_clean.csv", \
     required=False, help='specify the path for train.csv')
 parser.add_argument('-test_data_path', type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
     required=False, help='specify the path for test.csv')
@@ -41,10 +42,6 @@ parser.add_argument('--model_type', type=str, default="bert-base-uncased", \
 
 
 ############################################ Define Dataset Contants
-
-MAX_LEN = 768
-#MAX_Q_LEN = 250
-#MAX_A_LEN = 259
 SEP_TOKEN_ID = 102
 
 TARGET_COLUMNS = ['question_asker_intent_understanding',
@@ -82,41 +79,83 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
 ############################################ Define Dataset 
 
 class QuestDataset(torch.utils.data.Dataset):
-    def __init__(self, df, model_type="xlnet-base-uncased", train_mode=True, labeled=True, augment=True):
+    def __init__(self, df, host_encoder=None, category_encoder=None, max_len=512, model_type="xlnet-base-uncased", train_mode=True, labeled=True, \
+                augment=True, extra_token=False):
         self.df = df
+        self.max_len = max_len
         self.model_type = model_type
         self.train_mode = train_mode
         self.labeled = labeled
         
-        if ((self.model_type == "bert-base-uncased") \
-            or (self.model_type == "bert-base-cased") \
-            or (self.model_type == "bert-large-uncased") \
-            or (self.model_type == "bert-large-cased")):
+        # print(self.model_type)
+        
+        if ((self.model_type == "bert-base-uncased") or (self.model_type == "bert-large-uncased")):
             
-            self.tokenizer = BertTokenizer.from_pretrained(model_type)
+            self.tokenizer = BertTokenizer.from_pretrained(model_type,\
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+            
+        elif((self.model_type == "bert-base-cased") or (self.model_type == "bert-large-cased")):
+            
+            self.tokenizer = BertTokenizer.from_pretrained(model_type,\
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
             
         elif ((self.model_type == "xlnet-base-cased") \
             or (self.model_type == "xlnet-large-cased")):
             
-            self.tokenizer = XLNetTokenizer.from_pretrained(model_type)
+            self.tokenizer = XLNetTokenizer.from_pretrained(model_type, \
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+            
+        elif((self.model_type == "roberta-base")):
+            
+            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base", \
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+            
+        elif((self.model_type == "albert-base-v2") or (self.model_type == "albert-large-v2") \
+            or (self.model_type == "albert-xlarge-v2") \
+            or (self.model_type == "albert-xxlarge-v2")):
+            
+            self.tokenizer = AlbertTokenizer.from_pretrained(model_type, \
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+            
+        elif((self.model_type == "gpt2")):
+            
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2", \
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
             
         else:
             
             raise NotImplementedError
             
         self.augment = augment
+        self.extra_token = extra_token
         self.translation_title_rate = 0.5
         self.translation_body_rate = 0.5
         self.translation_answer_rate = 0.5
         self.translation_single_language = 0.25
         self.random_select_date = 0.1
+        
+        # one-hot encode category and host columns
+        if host_encoder is not None:
+            transformed = host_encoder.transform(self.df["host"])
+            self.df["host"] = transformed.tolist()
+            self.df["host"] = self.df["host"].apply(lambda x: np.array(x))
+        
+        if category_encoder is not None:
+            transformed = category_encoder.transform(self.df["category"])
+            self.df["category"] = transformed.tolist()
+            self.df["category"] = self.df["category"].apply(lambda x: np.array(x))
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
         token_ids, seg_ids = self.get_token_ids(row, index)
         if self.labeled:
             labels = self.get_label(row)
-            return token_ids, seg_ids, labels
+            if self.extra_token:
+                category_label = torch.tensor(row.category)
+                host_label = torch.tensor(row.host)
+                return token_ids, seg_ids, labels, category_label, host_label
+            else:
+                return token_ids, seg_ids, labels
         else:
             return token_ids, seg_ids
 
@@ -172,8 +211,8 @@ class QuestDataset(torch.utils.data.Dataset):
         else:
             return tokens[:max_num//2] + tokens[-(max_num - max_num//2):]
 
-    def trim_input(self, title, question, answer, max_sequence_length=MAX_LEN, 
-                t_max_len=30, q_max_len=int((MAX_LEN-30-4)/2), a_max_len=(MAX_LEN-30-4 - int((MAX_LEN-30-4)/2))):
+    def trim_input(self, title, question, answer, max_sequence_length=512, 
+                t_max_len=30, q_max_len=int((512-30-4)/2), a_max_len=(512-30-4 - int((512-30-4)/2)), num_token=4):
 
         if self.augment:
             # print("title: ", title)
@@ -211,9 +250,9 @@ class QuestDataset(torch.utils.data.Dataset):
                 q_new_len = q_max_len
 
 
-            if t_new_len+a_new_len+q_new_len+4 != max_sequence_length:
+            if t_new_len+a_new_len+q_new_len+num_token != max_sequence_length:
                 raise ValueError("New sequence length should be %d, but is %d" 
-                                 % (max_sequence_length, (t_new_len+a_new_len+q_new_len+4)))
+                                 % (max_sequence_length, (t_new_len+a_new_len+q_new_len+num_token)))
 
             if self.augment:
                 # random select
@@ -260,9 +299,25 @@ class QuestDataset(torch.utils.data.Dataset):
                 q = q[:q_new_len]
                 a = a[:a_new_len]
 
+        # some bad cases
+        if (len(a) + len(t) + len(q) + num_token > max_sequence_length):
+            more_token = len(a) + len(t) + len(q) + num_token - max_sequence_length
+            a = a[:(len(a)-more_token)]
+        
         return t, q, a
         
     def get_token_ids(self, row, index):
+        
+        if self.extra_token:
+            num_token = 6
+        else:
+            num_token = 4
+            
+        t_max_len=30
+        q_max_len=int((self.max_len-t_max_len-num_token)/2)
+        a_max_len=(self.max_len-t_max_len - num_token - int((self.max_len-t_max_len-num_token)/2))
+        # print(t_max_len, q_max_len, a_max_len)
+        
         if self.augment:
             
             if random.random() < self.translation_title_rate:
@@ -315,33 +370,53 @@ class QuestDataset(torch.utils.data.Dataset):
             if not isinstance(answer, str):
                 if np.isnan(answer):
                     answer = row.answer
-             
-            t_tokens, q_tokens, a_tokens = self.trim_input(title, question, answer)
+        
+            t_tokens, q_tokens, a_tokens = self.trim_input(title, question, answer, max_sequence_length=self.max_len, \
+                t_max_len=t_max_len, q_max_len=q_max_len, a_max_len=a_max_len, num_token=num_token)
             
         else:
-            t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer)
+            t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer, \
+                max_sequence_length=self.max_len, \
+                t_max_len=t_max_len, q_max_len=q_max_len, a_max_len=a_max_len, num_token=num_token)
 
         if ((self.model_type == "bert-base-uncased") \
             or (self.model_type == "bert-base-cased") \
             or (self.model_type == "bert-large-uncased") \
             or (self.model_type == "bert-large-cased")):
-            
-            tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+    
+            if self.extra_token:
+                # tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            else:
+                tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
             
         elif ((self.model_type == "xlnet-base-cased") \
             or (self.model_type == "xlnet-large-cased")):
             
-            tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
-            # tokens = t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
-            # tokens =  t_tokens + q_tokens + a_tokens + ['[SEP]'] + ['[CLS]']
+            if self.extra_token:
+                # tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            else:
+                tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            
+        elif ((self.model_type == "albert-base-v2") \
+            or (self.model_type == "albert-large-v2") \
+            or (self.model_type == "albert-xlarge-v2") \
+            or (self.model_type == "albert-xxlarge-v2")):
+            
+            if self.extra_token:
+                # tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            else:
+                tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
             
         else:
             
             raise NotImplementedError
         
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-        if len(token_ids) < MAX_LEN:
-            token_ids += [0] * (MAX_LEN - len(token_ids))
+        if len(token_ids) < self.max_len:
+            token_ids += [0] * (self.max_len - len(token_ids))
         ids = torch.tensor(token_ids)
         seg_ids = self.get_seg_ids(ids)
         return ids, seg_ids
@@ -372,16 +447,26 @@ class QuestDataset(torch.utils.data.Dataset):
     
         if self.labeled:
             labels = torch.stack([x[2] for x in batch])
-            return token_ids, seg_ids, labels
+            if self.extra_token:
+                category_labels = torch.stack([x[3] for x in batch])
+                host_labels = torch.stack([x[4] for x in batch])
+                return token_ids, seg_ids, labels, category_labels, host_labels
+            else:
+                return token_ids, seg_ids, labels
         else:
             return token_ids, seg_ids
 
 
-def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", model_type="bert-base-uncased", batch_size=4):
-    df = pd.read_csv(data_path)
-    ds_test = QuestDataset(df, model_type, train_mode=False, labeled=False, augment=False)
+def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
+    max_len=512, \
+    model_type="bert-base-uncased", \
+    batch_size=4, \
+    extra_token=True):
+    
+    ds_test = QuestDataset(test_df, None, None, max_len, \
+        model_type, train_mode=False, labeled=False, augment=False, extra_token=extra_token)
     loader = torch.utils.data.DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=ds_test.collate_fn, drop_last=False)
-    loader.num = len(df)
+    loader.num = len(test_df)
     
     return loader
 
@@ -409,11 +494,15 @@ def get_train_val_split(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Ans
 
 def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                         val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                        host_encoder=None, \
+                        category_encoder=None, \
+                        max_len=512, \
                         model_type="bert-base-uncased", \
                         batch_size=4, \
                         val_batch_size=4, \
                         num_workers=2, \
-                        augment=True):
+                        augment=True, \
+                        extra_token=True):
 
     
     df_train = pd.read_csv(train_data_path, encoding='utf8')
@@ -422,11 +511,13 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
     print(df_train.shape)
     print(df_val.shape)
 
-    ds_train = QuestDataset(df_train, model_type, train_mode=True, labeled=True, augment=augment)
+    ds_train = QuestDataset(df_train, host_encoder, category_encoder, max_len, \
+        model_type, train_mode=True, labeled=True, augment=augment, extra_token=extra_token)
     train_loader = torch.utils.data.DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=ds_train.collate_fn, drop_last=True)
     train_loader.num = len(df_train)
 
-    ds_val = QuestDataset(df_val, model_type, train_mode=False, labeled=True, augment=False)
+    ds_val = QuestDataset(df_val, host_encoder, category_encoder, max_len, \
+        model_type, train_mode=False, labeled=True, augment=False, extra_token=extra_token)
     val_loader = torch.utils.data.DataLoader(ds_val, batch_size=val_batch_size, shuffle=False, num_workers=num_workers, collate_fn=ds_val.collate_fn, drop_last=False)
     val_loader.num = len(df_val)
     val_loader.df = df_val
@@ -454,42 +545,76 @@ def test_train_val_split(data_path, \
 
 def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                      val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
+                     host_encoder=None, \
+                     category_encoder=None, \
                      model_type="bert-base-uncased", \
                      batch_size=4, \
                      val_batch_size=4, \
-                     num_workers=2):
+                     num_workers=2, \
+                     extra_token=True):
+    
+    train_loader, val_loader = get_train_val_loaders(train_data_path=train_data_path, \
+                     val_data_path=val_data_path, \
+                     host_encoder=host_encoder, \
+                     category_encoder=category_encoder, \
+                     model_type=model_type, \
+                     batch_size=batch_size, \
+                     val_batch_size=val_batch_size, \
+                     num_workers=num_workers, \
+                     extra_token=extra_token)
+        
+    if extra_token:
+        for ids, seg_ids, labels, category_labels, host_labels in train_loader:
+            print("------------------------testing train loader with extra_token----------------------")
+            print("ids:", ids)
+            print("seg_ids (numpy): ", seg_ids.numpy())
+            print("labels: ", labels)
+            print("category_labels shape: ", category_labels.shape)
+            print("host_labels shape: ", host_labels.shape)
+            print("category_labels: ", category_labels)
+            print("host_labels: ", host_labels)
+            print("------------------------testing train loader finished----------------------")
+            break
 
-    train_loader, val_loader = get_train_val_loaders(train_data_path, \
-                     val_data_path, \
-                     model_type, \
-                     batch_size, \
-                     val_batch_size, \
-                     num_workers)
+        for ids, seg_ids, labels, category_labels, host_labels in val_loader:
+            print("------------------------testing val loader with extra_token----------------------")
+            print("ids:", ids)
+            print("seg_ids (numpy): ", seg_ids.numpy())
+            print("category_labels shape: ", category_labels.shape)
+            print("host_labels shape: ", host_labels.shape)
+            print("labels: ", labels)
+            print("category_labels: ", category_labels)
+            print("host_labels: ", host_labels)
+            print("------------------------testing val loader finished----------------------")
+            break
+        
+    else:
+        for ids, seg_ids, labels in train_loader:
+            print("------------------------testing train loader without extra_token----------------------")
+            print("ids:", ids)
+            print("seg_ids (numpy): ", seg_ids.numpy())
+            print("labels: ", labels)
+            print("------------------------testing train loader finished----------------------")
+            break
 
-    for ids, seg_ids, labels in train_loader:
-        print("------------------------testing train loader----------------------")
-        print("ids:", ids)
-        print("seg_ids (numpy): ", seg_ids.numpy())
-        print("labels: ", labels)
-        print("------------------------testing train loader finished----------------------")
-        break
-
-    for ids, seg_ids, labels in val_loader:
-        print("------------------------testing val loader----------------------")
-        print("ids:", ids)
-        print("seg_ids (numpy): ", seg_ids.numpy())
-        print("labels: ", labels)
-        print("------------------------testing val loader finished----------------------")
-        break
+        for ids, seg_ids, labels in val_loader:
+            print("------------------------testing val loader without extra_token----------------------")
+            print("ids:", ids)
+            print("seg_ids (numpy): ", seg_ids.numpy())
+            print("labels: ", labels)
+            print("------------------------testing val loader finished----------------------")
+            break
 
 
 def test_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
                      model_type="bert-base-uncased", \
-                     batch_size=4):
+                     batch_size=4, \
+                     extra_token=True):
 
-    loader = get_test_loader(data_path, \
-                            model_type, \
-                            batch_size)
+    loader = get_test_loader(data_path=data_path, \
+                            model_type=model_type, \
+                            batch_size=batch_size, \
+                            extra_token=extra_token)
 
     for ids, seg_ids in loader:
         print("------------------------testing test loader----------------------")
@@ -502,12 +627,26 @@ def test_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer
 if __name__ == "__main__":
 
     args = parser.parse_args()
+    
+    # one hot columns
+    train_df = pd.read_csv(args.data_path)
+    test_df = pd.read_csv(args.test_data_path)
+    
+    train_host_list = train_df['host'].unique().tolist()
+    test_host_list = test_df['host'].unique().tolist()
+    host_encoder = LabelBinarizer()
+    host_encoder.fit(list(set(train_host_list + test_host_list)))
+    
+    train_category_list = train_df['category'].unique().tolist()
+    test_category_list = test_df['category'].unique().tolist()
+    category_encoder = LabelBinarizer()
+    category_encoder.fit(list(set(train_category_list + test_category_list)))
 
     # test getting train val splitting
-    test_train_val_split(args.data_path, \
-                         args.save_path, \
-                         args.n_splits, \
-                         args.seed)
+    # test_train_val_split(args.data_path, \
+    #                      args.save_path, \
+    #                      args.n_splits, \
+    #                      args.seed)
 
     # test train_data_loader
      
@@ -516,6 +655,8 @@ if __name__ == "__main__":
 
     test_train_loader(train_data_path=train_data_path, \
                       val_data_path=val_data_path, \
+                      host_encoder=host_encoder, \
+                      category_encoder=category_encoder, \
                       model_type=args.model_type, \
                       batch_size=args.batch_size, \
                       val_batch_size=args.val_batch_size, \
@@ -525,3 +666,20 @@ if __name__ == "__main__":
     test_test_loader(data_path=args.test_data_path, \
                      model_type=args.model_type, \
                      batch_size=args.val_batch_size)
+    
+    
+    test_train_loader(train_data_path=train_data_path, \
+                      val_data_path=val_data_path, \
+                      host_encoder=host_encoder, \
+                      category_encoder=category_encoder, \
+                      model_type=args.model_type, \
+                      batch_size=args.batch_size, \
+                      val_batch_size=args.val_batch_size, \
+                      num_workers=args.num_workers, \
+                      extra_token=False)
+
+    # test test_data_loader
+    test_test_loader(data_path=args.test_data_path, \
+                     model_type=args.model_type, \
+                     batch_size=args.val_batch_size, \
+                      extra_token=False)

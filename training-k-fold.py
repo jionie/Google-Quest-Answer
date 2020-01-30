@@ -49,7 +49,7 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -2, -4, -6, -8], \
+parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -65,6 +65,7 @@ parser.add_argument('--num_workers', type=int, default=2, \
 parser.add_argument("--start_epoch", type=int, default=0, required=False, help="specify the start epoch for continue training")
 parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/model", \
     required=False, help="specify the folder for checkpoint")
+parser.add_argument('--extra_token', action='store_true', default=False, help='whether to use extra token for extra tasks')
 parser.add_argument('--load_pretrain', action='store_true', default=False, help='whether to load pretrain model')
 parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
@@ -75,8 +76,11 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 
 ############################################################################## Define Constant
 NUM_CLASS = 30
+NUM_CATEGORY_CLASS=5
+NUM_HOST_CLASS=64
+AUXILIARY_WEIGHTs = [1, 0.05, 0.05]
 DECAY_FACTOR = 0.95
-MIN_LR = 2e-6
+MIN_LR = 1.5e-6
 # UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
 #                   1, 2, 2, 4, 1, 2, \
 #                   4, 4, 4, 4, 1, 2, \
@@ -84,8 +88,8 @@ MIN_LR = 2e-6
 #                   2, 1, 1, 2, 1, 2]
 
 UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, \
-                     1, 1, 1, 1, 1, 1, \
-                     1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 2, 1, 1, \
+                     2, 2, 2, 2, 1, 1, \
                      1, 1, 1, 1, 1, 1, \
                      1, 1, 1, 1, 1, 1]
 
@@ -127,6 +131,7 @@ def training(
             load_pretrain,
             seed,
             loss,
+            extra_token, 
             augment
             ):
     
@@ -151,11 +156,19 @@ def training(
     COMMON_STRING += '\n'
     
     if augment:
-        checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
-            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_relu/')
+        if extra_token:
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+                optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_extra_token/')
+        else:
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+                optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential/')
     else:
-        checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
-            optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '/')
+        if extra_token:
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+                optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'extra_token/')
+        else:
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+                optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + '/')
 
     checkpoint_filename = 'fold_' + str(fold) + "_checkpoint.pth"
     checkpoint_filepath = os.path.join(checkpoint_folder, checkpoint_filename)
@@ -192,9 +205,35 @@ def training(
 
     ############################################################################### model
     if model_type == "bert":
-        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
+        if extra_token:
+            model = QuestNet(model_type=model_name, \
+                    n_classes=NUM_CLASS, \
+                    n_category_classes=NUM_CATEGORY_CLASS, \
+                    n_host_classes=NUM_HOST_CLASS, \
+                    hidden_layers=hidden_layers, \
+                    extra_token=True)
+        else:
+            model = QuestNet(model_type=model_name, \
+                    n_classes=NUM_CLASS, \
+                    n_category_classes=NUM_CATEGORY_CLASS, \
+                    n_host_classes=NUM_HOST_CLASS, \
+                    hidden_layers=hidden_layers, \
+                    extra_token=False)
     elif model_type == "xlnet":
-        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
+        if extra_token:
+            model = QuestNet(model_type=model_name, \
+                    n_classes=NUM_CLASS, \
+                    n_category_classes=NUM_CATEGORY_CLASS, \
+                    n_host_classes=NUM_HOST_CLASS, \
+                    hidden_layers=hidden_layers, \
+                    extra_token=True)
+        else:
+            model = QuestNet(model_type=model_name, \
+                    n_classes=NUM_CLASS, \
+                    n_category_classes=NUM_CATEGORY_CLASS, \
+                    n_host_classes=NUM_HOST_CLASS, \
+                    hidden_layers=hidden_layers, \
+                    extra_token=False)
     else:
         raise NotImplementedError
     
@@ -210,7 +249,7 @@ def training(
         list_lr = []
         
         if ((model_name == "bert-base-uncased") or (model_name == "bert-base-cased")):
-            
+
             list_layers = [model.bert_model.embeddings,
                       model.bert_model.encoder.layer[0],
                       model.bert_model.encoder.layer[1],
@@ -309,6 +348,57 @@ def training(
                       model.fc
                       ]
             
+        elif (model_name == "roberta-base"):
+            
+            list_layers = [model.roberta_model.word_embedding,
+                      model.roberta_model.layer[0],
+                      model.roberta_model.layer[1],
+                      model.roberta_model.layer[2],
+                      model.roberta_model.layer[3],
+                      model.roberta_model.layer[4],
+                      model.roberta_model.layer[5],
+                      model.roberta_model.layer[6],
+                      model.roberta_model.layer[7],
+                      model.roberta_model.layer[8],
+                      model.roberta_model.layer[9],
+                      model.roberta_model.layer[10],
+                      model.roberta_model.layer[11],
+                      model.fc_1,
+                      model.fc
+                      ]
+            
+        elif ((model_name == "albert-base-v2") or \
+            (model_name == "albert-large-v2") or \
+            (model_name == "albert-xlarge-v2") or \
+            (model_name == "albert-xxlarge-v2")):
+            list_layers = [model.albert_model.embeddings,
+                        #    model.albert_model.encoder.embedding_hidden_mapping_in,
+                        #    model.albert_model.encoder.albert_layer_groups,
+                           model.albert_model.encoder,
+                           model.fc_1,
+                           model.fc
+                           ]
+            print("differential lr for ", model_name)
+
+        elif (model_name == "gpt2"):
+            list_layers = [# model.gpt2_model.wte,
+                           # model.gpt2_model.wpe,
+                           model.gpt2_model.h[0],
+                           model.gpt2_model.h[1],
+                           model.gpt2_model.h[2],
+                           model.gpt2_model.h[3],
+                           model.gpt2_model.h[4],
+                           model.gpt2_model.h[5],
+                           model.gpt2_model.h[6],
+                           model.gpt2_model.h[7],
+                           model.gpt2_model.h[8],
+                           model.gpt2_model.h[9],
+                           model.gpt2_model.h[10],
+                           model.gpt2_model.h[11],
+                           model.fc_1,
+                           model.fc
+                           ]
+
         else:
             raise NotImplementedError
 
@@ -318,7 +408,6 @@ def training(
 #             list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
 
 #         list_lr.reverse()
-#         list_lr[-1] = 0
         
         mult = lr / MIN_LR
         step = mult**(1/(len(list_layers)-1))
@@ -340,6 +429,46 @@ def training(
                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
                 'lr': list_lr[i], \
                 'weight_decay': 0.0}) 
+            
+        if extra_token:
+            # add extra fcs
+            layer_parameters = list(model.fc_1_category.named_parameters())
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.01})
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.0}) 
+            layer_parameters = list(model.fc_1_host.named_parameters())
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.01})
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.0})
+            
+            layer_parameters = list(model.fc_category.named_parameters())
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.01})
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.0}) 
+            layer_parameters = list(model.fc_host.named_parameters())
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.01})
+            optimizer_grouped_parameters.append({ \
+                'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                'lr': 1e-6, \
+                'weight_decay': 0.0})
             
         print("Differential Learning Rate!!")
     
@@ -419,6 +548,7 @@ def training(
         # weights = torch.tensor(np.array(TRAING_WEIGIHT) / np.sum(TRAING_WEIGIHT) * 30, dtype=torch.float64).cuda()
         weights = torch.tensor(np.array(TRAING_WEIGIHT), dtype=torch.float64).cuda()
         criterion = nn.BCEWithLogitsLoss(weight=weights)
+        criterion_extra = nn.BCEWithLogitsLoss()
     elif loss == 'mse-bce':
         criterion = MSEBCELoss()
     elif loss == 'focal':
@@ -451,113 +581,234 @@ def training(
         torch.cuda.empty_cache()
         model.zero_grad()
         
-        for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
-   
-            rate = 0
-            for param_group in optimizer.param_groups:
-                rate += param_group['lr'] / len(optimizer.param_groups)
-                
-            # set model training mode
-            model.train() 
-
-            # set input to cuda mode
-            token_ids = token_ids.cuda()
-            seg_ids   = seg_ids.cuda()
-            labels    = labels.cuda().float()
-
-            # predict and calculate loss (only need torch.sigmoid when inference)
-            prediction = model(token_ids, seg_ids)  
-            loss = criterion(prediction, labels)
-            
-            # use apex
-            with amp.scale_loss(loss/accumulation_steps, optimizer) as scaled_loss:
-                scaled_loss.backward()
-
-            # don't use apex
-            #loss.backward()
+        if extra_token:
+            for tr_batch_i, (token_ids, seg_ids, labels, labels_category, labels_host) in enumerate(train_data_loader):
         
-            if ((tr_batch_i+1) % accumulation_steps == 0):
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0, norm_type=2)
-                optimizer.step()
-                model.zero_grad()
-                # adjust lr
-                if (lr_scheduler_each_iter):
-                    scheduler.step()
-
-                writer.add_scalar('train_loss_' + str(fold), loss.item(), (epoch-1)*len(train_data_loader)*batch_size+tr_batch_i*batch_size)
-            
-            # calculate statistics
-            prediction = torch.sigmoid(prediction)
-
-            if tr_batch_i == 0:
-                labels_train = labels.cpu().detach().numpy()
-                pred_train   = prediction.cpu().detach().numpy()
-            else:
-                labels_train = np.concatenate((labels_train, labels.cpu().detach().numpy()), axis=0)
-                pred_train   = np.concatenate((pred_train, prediction.cpu().detach().numpy()), axis=0)
-            
-            l = np.array([loss.item() * batch_size])
-            n = np.array([batch_size])
-            sum_train_loss = sum_train_loss + l
-            sum_train      = sum_train + n
-            
-            # log for training
-            if (tr_batch_i+1) % log_step == 0:  
-                train_loss          = sum_train_loss / (sum_train + 1e-12)
-                sum_train_loss[...] = 0
-                sum_train[...]      = 0
-                spearman            = Spearman(labels_train, pred_train)
-                log.write('lr: %f train loss: %f train_spearman: %f\n' % \
-                    (rate, train_loss[0], spearman))
-            
-            if (tr_batch_i+1) % eval_step == 0:  
-                
-                eval_count += 1
-                
-                valid_loss = np.zeros(1, np.float32)
-                valid_num  = np.zeros_like(valid_loss)
-                
-                with torch.no_grad():
+                rate = 0
+                for param_group in optimizer.param_groups:
+                    rate += param_group['lr'] / len(optimizer.param_groups)
                     
-                    # init cache
-                    torch.cuda.empty_cache()
+                # set model training mode
+                model.train() 
 
-                    for val_batch_i, (token_ids, seg_ids, labels) in enumerate(val_data_loader):
+                # set input to cuda mode
+                token_ids = token_ids.cuda()
+                seg_ids   = seg_ids.cuda()
+                labels    = labels.cuda().float()
+                labels_category = labels_category.cuda().float()
+                labels_host     = labels_host.cuda().float()
+
+                # predict and calculate loss (only need torch.sigmoid when inference)
+                prediction, prediction_category, prediction_host = model(token_ids, seg_ids)  
+                
+                # print(prediction.shape, prediction_category.shape, prediction_host.shape)
+                # print(labels.shape, labels_category.shape, labels_host.shape)
+                
+                loss = AUXILIARY_WEIGHTs[0]*criterion(prediction, labels) + \
+                       AUXILIARY_WEIGHTs[1]*criterion_extra(prediction_category, labels_category) + \
+                       AUXILIARY_WEIGHTs[2]*criterion_extra(prediction_host, labels_host) 
+                
+                # use apex
+                with amp.scale_loss(loss/accumulation_steps, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+
+                # don't use apex
+                #loss.backward()
+            
+                if ((tr_batch_i+1) % accumulation_steps == 0):
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0, norm_type=2)
+                    optimizer.step()
+                    model.zero_grad()
+                    # adjust lr
+                    if (lr_scheduler_each_iter):
+                        scheduler.step()
+
+                    writer.add_scalar('train_loss_' + str(fold), loss.item(), (epoch-1)*len(train_data_loader)*batch_size+tr_batch_i*batch_size)
+                
+                # calculate statistics
+                prediction = torch.sigmoid(prediction)
+
+                if tr_batch_i == 0:
+                    labels_train = labels.cpu().detach().numpy()
+                    pred_train   = prediction.cpu().detach().numpy()
+                else:
+                    labels_train = np.concatenate((labels_train, labels.cpu().detach().numpy()), axis=0)
+                    pred_train   = np.concatenate((pred_train, prediction.cpu().detach().numpy()), axis=0)
+                
+                l = np.array([loss.item() * batch_size])
+                n = np.array([batch_size])
+                sum_train_loss = sum_train_loss + l
+                sum_train      = sum_train + n
+                
+                # log for training
+                if (tr_batch_i+1) % log_step == 0:  
+                    train_loss          = sum_train_loss / (sum_train + 1e-12)
+                    sum_train_loss[...] = 0
+                    sum_train[...]      = 0
+                    spearman            = Spearman(labels_train, pred_train)
+                    log.write('lr: %f train loss: %f train_spearman: %f\n' % \
+                        (rate, train_loss[0], spearman))
+                
+                if (tr_batch_i+1) % eval_step == 0:  
+                    
+                    eval_count += 1
+                    
+                    valid_loss = np.zeros(1, np.float32)
+                    valid_num  = np.zeros_like(valid_loss)
+                    
+                    with torch.no_grad():
                         
-                        # set model to eval mode
-                        model.eval()
+                        # init cache
+                        torch.cuda.empty_cache()
 
-                        # set input to cuda mode
-                        token_ids = token_ids.cuda()
-                        seg_ids   = seg_ids.cuda()
-                        labels    = labels.cuda().float()
-
-                        # predict and calculate loss (only need torch.sigmoid when inference)
-                        prediction = model(token_ids, seg_ids)  
-                        loss = criterion(prediction, labels)
+                        for val_batch_i, (token_ids, seg_ids, labels, labels_category, labels_host) in enumerate(val_data_loader):
                             
-                        writer.add_scalar('val_loss_' + str(fold), loss.item(), (eval_count-1)*len(val_data_loader)*valid_batch_size+val_batch_i*valid_batch_size)
+                            # set model to eval mode
+                            model.eval()
+
+                            # set input to cuda mode
+                            token_ids = token_ids.cuda()
+                            seg_ids   = seg_ids.cuda()
+                            labels    = labels.cuda().float()
+                            labels_category = labels_category.cuda().float()
+                            labels_host     = labels_host.cuda().float()
+
+                            # predict and calculate loss (only need torch.sigmoid when inference)
+                            prediction, prediction_category, prediction_host = model(token_ids, seg_ids)  
+                            loss = AUXILIARY_WEIGHTs[0]*criterion(prediction, labels) + \
+                                    AUXILIARY_WEIGHTs[1]*criterion_extra(prediction_category, labels_category) + \
+                                    AUXILIARY_WEIGHTs[2]*criterion_extra(prediction_host, labels_host) 
+                                
+                            writer.add_scalar('val_loss_' + str(fold), loss.item(), (eval_count-1)*len(val_data_loader)*valid_batch_size+val_batch_i*valid_batch_size)
+                            
+                            # calculate statistics
+                            prediction = torch.sigmoid(prediction)
+
+                            if val_batch_i == 0:
+                                labels_val = labels.cpu().detach().numpy()
+                                pred_val   = prediction.cpu().detach().numpy()
+                            else:
+                                labels_val = np.concatenate((labels_val, labels.cpu().detach().numpy()), axis=0)
+                                pred_val   = np.concatenate((pred_val, prediction.cpu().detach().numpy()), axis=0)
+
+                            l = np.array([loss.item()*valid_batch_size])
+                            n = np.array([valid_batch_size])
+                            valid_loss = valid_loss + l
+                            valid_num  = valid_num + n
+                            
+                        valid_loss = valid_loss / valid_num
+                        spearman   = Spearman(labels_val, pred_val)
+
+                        log.write('validation loss: %f val_spearman: %f\n' % \
+                        (valid_loss[0], spearman))
+        else:
+            for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
+    
+                rate = 0
+                for param_group in optimizer.param_groups:
+                    rate += param_group['lr'] / len(optimizer.param_groups)
+                    
+                # set model training mode
+                model.train() 
+
+                # set input to cuda mode
+                token_ids = token_ids.cuda()
+                seg_ids   = seg_ids.cuda()
+                labels    = labels.cuda().float()
+
+                # predict and calculate loss (only need torch.sigmoid when inference)
+                prediction = model(token_ids, seg_ids)  
+                loss = criterion(prediction, labels)
+                
+                # use apex
+                with amp.scale_loss(loss/accumulation_steps, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+
+                # don't use apex
+                #loss.backward()
+            
+                if ((tr_batch_i+1) % accumulation_steps == 0):
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0, norm_type=2)
+                    optimizer.step()
+                    model.zero_grad()
+                    # adjust lr
+                    if (lr_scheduler_each_iter):
+                        scheduler.step()
+
+                    writer.add_scalar('train_loss_' + str(fold), loss.item(), (epoch-1)*len(train_data_loader)*batch_size+tr_batch_i*batch_size)
+                
+                # calculate statistics
+                prediction = torch.sigmoid(prediction)
+
+                if tr_batch_i == 0:
+                    labels_train = labels.cpu().detach().numpy()
+                    pred_train   = prediction.cpu().detach().numpy()
+                else:
+                    labels_train = np.concatenate((labels_train, labels.cpu().detach().numpy()), axis=0)
+                    pred_train   = np.concatenate((pred_train, prediction.cpu().detach().numpy()), axis=0)
+                
+                l = np.array([loss.item() * batch_size])
+                n = np.array([batch_size])
+                sum_train_loss = sum_train_loss + l
+                sum_train      = sum_train + n
+                
+                # log for training
+                if (tr_batch_i+1) % log_step == 0:  
+                    train_loss          = sum_train_loss / (sum_train + 1e-12)
+                    sum_train_loss[...] = 0
+                    sum_train[...]      = 0
+                    spearman            = Spearman(labels_train, pred_train)
+                    log.write('lr: %f train loss: %f train_spearman: %f\n' % \
+                        (rate, train_loss[0], spearman))
+                
+                if (tr_batch_i+1) % eval_step == 0:  
+                    
+                    eval_count += 1
+                    
+                    valid_loss = np.zeros(1, np.float32)
+                    valid_num  = np.zeros_like(valid_loss)
+                    
+                    with torch.no_grad():
                         
-                        # calculate statistics
-                        prediction = torch.sigmoid(prediction)
+                        # init cache
+                        torch.cuda.empty_cache()
 
-                        if val_batch_i == 0:
-                            labels_val = labels.cpu().detach().numpy()
-                            pred_val   = prediction.cpu().detach().numpy()
-                        else:
-                            labels_val = np.concatenate((labels_val, labels.cpu().detach().numpy()), axis=0)
-                            pred_val   = np.concatenate((pred_val, prediction.cpu().detach().numpy()), axis=0)
+                        for val_batch_i, (token_ids, seg_ids, labels) in enumerate(val_data_loader):
+                            
+                            # set model to eval mode
+                            model.eval()
 
-                        l = np.array([loss.item()*valid_batch_size])
-                        n = np.array([valid_batch_size])
-                        valid_loss = valid_loss + l
-                        valid_num  = valid_num + n
-                        
-                    valid_loss = valid_loss / valid_num
-                    spearman   = Spearman(labels_val, pred_val)
+                            # set input to cuda mode
+                            token_ids = token_ids.cuda()
+                            seg_ids   = seg_ids.cuda()
+                            labels    = labels.cuda().float()
 
-                    log.write('validation loss: %f val_spearman: %f\n' % \
-                    (valid_loss[0], spearman))
+                            # predict and calculate loss (only need torch.sigmoid when inference)
+                            prediction = model(token_ids, seg_ids)  
+                            loss = criterion(prediction, labels)
+                                
+                            writer.add_scalar('val_loss_' + str(fold), loss.item(), (eval_count-1)*len(val_data_loader)*valid_batch_size+val_batch_i*valid_batch_size)
+                            
+                            # calculate statistics
+                            prediction = torch.sigmoid(prediction)
+
+                            if val_batch_i == 0:
+                                labels_val = labels.cpu().detach().numpy()
+                                pred_val   = prediction.cpu().detach().numpy()
+                            else:
+                                labels_val = np.concatenate((labels_val, labels.cpu().detach().numpy()), axis=0)
+                                pred_val   = np.concatenate((pred_val, prediction.cpu().detach().numpy()), axis=0)
+
+                            l = np.array([loss.item()*valid_batch_size])
+                            n = np.array([valid_batch_size])
+                            valid_loss = valid_loss + l
+                            valid_num  = valid_num + n
+                            
+                        valid_loss = valid_loss / valid_num
+                        spearman   = Spearman(labels_val, pred_val)
+
+                        log.write('validation loss: %f val_spearman: %f\n' % \
+                        (valid_loss[0], spearman))
 
         val_metric_epoch = spearman
 
@@ -594,13 +845,43 @@ if __name__ == "__main__":
     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(args.fold, args.seed)
 
     if ((args.model_type == "bert") or (args.model_type == "xlnet")):
-        train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
-                                                    val_data_path=val_data_path, \
-                                                    model_type=args.model_name, \
-                                                    batch_size=args.batch_size, \
-                                                    val_batch_size=args.valid_batch_size, \
-                                                    num_workers=args.num_workers, \
-                                                    augment=args.augment)
+        
+        if args.extra_token:
+            test_data_path = args.train_data_folder + "test.csv"
+            train_df = pd.read_csv(data_path)
+            test_df = pd.read_csv(test_data_path)
+            
+            train_host_list = train_df['host'].unique().tolist()
+            test_host_list = test_df['host'].unique().tolist()
+            host_encoder = LabelBinarizer()
+            host_encoder.fit(list(set(train_host_list + test_host_list)))
+            
+            train_category_list = train_df['category'].unique().tolist()
+            test_category_list = test_df['category'].unique().tolist()
+            category_encoder = LabelBinarizer()
+            category_encoder.fit(list(set(train_category_list + test_category_list)))
+
+            train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+                                                        val_data_path=val_data_path, \
+                                                        host_encoder=host_encoder, \
+                                                        category_encoder=category_encoder, \
+                                                        model_type=args.model_name, \
+                                                        batch_size=args.batch_size, \
+                                                        val_batch_size=args.valid_batch_size, \
+                                                        num_workers=args.num_workers, \
+                                                        augment=args.augment, \
+                                                        extra_token=True)
+            
+        else:
+        
+            train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+                                                        val_data_path=val_data_path, \
+                                                        model_type=args.model_name, \
+                                                        batch_size=args.batch_size, \
+                                                        val_batch_size=args.valid_batch_size, \
+                                                        num_workers=args.num_workers, \
+                                                        augment=args.augment, \
+                                                        extra_token=False)
     else:
         raise NotImplementedError
 
@@ -625,6 +906,7 @@ if __name__ == "__main__":
             args.load_pretrain, \
             args.seed, \
             args.loss, \
+            args.extra_token, \
             args.augment)
 
     gc.collect()
