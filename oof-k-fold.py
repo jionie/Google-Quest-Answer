@@ -249,7 +249,7 @@ def generate_oof_files(train_data_folder, \
 
 def get_spearman(train_df, oof_df, checkpoint_folder):
     
-    oof_df = postprocessing(oof_df)
+    # oof_df = postprocessing(oof_df)
 
     spearman = Spearman(train_df[TARGET_COLUMNS].values, oof_df[TARGET_COLUMNS].values)
     
@@ -410,34 +410,34 @@ if __name__ == "__main__":
     
     # get oof
     
-    for fold in range(args.n_splits):
+    # for fold in range(args.n_splits):
         
-        # get train_data_loader and val_data_loader
-        train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
-        val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
+    #     # get train_data_loader and val_data_loader
+    #     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
+    #     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
 
-        if ((args.model_type == "bert") or (args.model_type == "xlnet")):
-            _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
-                                                        val_data_path=val_data_path, \
-                                                        model_type=args.model_name, \
-                                                        batch_size=args.batch_size, \
-                                                        val_batch_size=args.valid_batch_size, \
-                                                        num_workers=args.num_workers, \
-                                                        augment=args.augment, \
-                                                        extra_token=False)
-        else:
-            raise NotImplementedError
+    #     if ((args.model_type == "bert") or (args.model_type == "xlnet")):
+    #         _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+    #                                                     val_data_path=val_data_path, \
+    #                                                     model_type=args.model_name, \
+    #                                                     batch_size=args.batch_size, \
+    #                                                     val_batch_size=args.valid_batch_size, \
+    #                                                     num_workers=args.num_workers, \
+    #                                                     augment=args.augment, \
+    #                                                     extra_token=False)
+    #     else:
+    #         raise NotImplementedError
 
     
-        get_oof(args.n_splits, \
-                fold, \
-                val_data_loader, \
-                args.model_type, \
-                args.model_name, \
-                args.hidden_layers, \
-                args.valid_batch_size, \
-                checkpoint_folder, \
-                args.seed)
+    #     get_oof(args.n_splits, \
+    #             fold, \
+    #             val_data_loader, \
+    #             args.model_type, \
+    #             args.model_name, \
+    #             args.hidden_layers, \
+    #             args.valid_batch_size, \
+    #             checkpoint_folder, \
+    #             args.seed)
     
     generate_oof_files(args.train_data_folder, \
                        args.n_splits, \
