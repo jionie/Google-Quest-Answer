@@ -162,14 +162,14 @@ def training(
             checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + content + '-' + loss + '-' + \
                 optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_extra_token/')
         else:
-            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + content + '-' + loss + '-' + \
                 optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential/')
     else:
         if extra_token:
-            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + content + '-' + loss + '-' + \
                 optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'extra_token/')
         else:
-            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + content + '-' + loss + '-' + \
                 optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + '/')
 
     checkpoint_filename = 'fold_' + str(fold) + "_checkpoint.pth"
