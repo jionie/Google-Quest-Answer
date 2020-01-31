@@ -46,7 +46,7 @@ parser.add_argument('--model_type', type=str, default="bert-base-uncased", \
 ############################################ Define Dataset Contants
 SEP_TOKEN_ID = 102
 
-TARGET_COLUMNS = ['question_asker_intent_understanding',
+QUESTION_TARGET_COLUMNS = ['question_asker_intent_understanding',
                 'question_body_critical',
                 'question_conversational',
                 'question_expect_short_answer',
@@ -67,6 +67,9 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
                 'question_type_reason_explanation',
                 'question_type_spelling',
                 'question_well_written',
+                ]
+
+ANSWER_TARGET_COLUMNS = [
                 'answer_helpful',
                 'answer_level_of_information',
                 'answer_plausible',
@@ -77,11 +80,13 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
                 'answer_type_reason_explanation',
                 'answer_well_written']
 
+TARGET_COLUMNS = QUESTION_TARGET_COLUMNS + ANSWER_TARGET_COLUMNS
+
 
 ############################################ Define Dataset 
 
 class QuestDataset(torch.utils.data.Dataset):
-    def __init__(self, df, host_encoder=None, category_encoder=None, max_len=512, \
+    def __init__(self, df, host_encoder=None, category_encoder=None, max_len=768, \
                 model_type="xlnet-base-uncased", \
                 content="Question", \
                 train_mode=True, labeled=True, \
@@ -606,7 +611,14 @@ class QuestDataset(torch.utils.data.Dataset):
 
     def get_label(self, row):
         #print(row[TARGET_COLUMNS].values)
-        return torch.tensor(row[TARGET_COLUMNS].values.astype(np.float32))
+        if self.content == "Question_Answer":
+            return torch.tensor(row[TARGET_COLUMNS].values.astype(np.float32))
+        elif self.content == "Question":
+            return torch.tensor(row[QUESTION_TARGET_COLUMNS].values.astype(np.float32))
+        elif self.content == "Answer":
+            return torch.tensor(row[ANSWER_TARGET_COLUMNS].values.astype(np.float32))
+        else:
+            raise NotImplementedError
 
     def collate_fn(self, batch):
         token_ids = torch.stack([x[0] for x in batch])

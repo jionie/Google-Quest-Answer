@@ -51,11 +51,11 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
+parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
-parser.add_argument("--warmup_proportion",  type=float, default=0.05, required=False, \
+parser.add_argument("--warmup_proportion",  type=float, default=0.001, required=False, \
     help="Proportion of training to perform linear learning rate warmup for. " "E.g., 0.1 = 10%% of training.")
 parser.add_argument("--lr", type=float, default=3e-5, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
@@ -77,12 +77,11 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 
 
 ############################################################################## Define Constant
-NUM_CLASS = 30
 NUM_CATEGORY_CLASS=5
 NUM_HOST_CLASS=64
 AUXILIARY_WEIGHTs = [1, 0.05, 0.05]
 DECAY_FACTOR = 0.95
-MIN_LR = 1.5e-6
+MIN_LR = 2e-6
 # UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
 #                   1, 2, 2, 4, 1, 2, \
 #                   4, 4, 4, 4, 1, 2, \
@@ -113,6 +112,7 @@ def seed_everything(seed=42):
 
 ############################################################################## define function for training
 def training(
+            content,
             n_splits,
             fold,
             train_data_loader, 
@@ -206,6 +206,16 @@ def training(
 
 
     ############################################################################### model
+    if content == "Question_Answer":
+        NUM_CLASS = 30
+    elif content == "Question":
+        NUM_CLASS = 21
+    elif content == "Answer":
+        NUM_CLASS = 9
+    else:
+        raise NotImplementedError
+        
+        
     if model_type == "bert":
         if extra_token:
             model = QuestNet(model_type=model_name, \
@@ -300,7 +310,7 @@ def training(
                   model.fc
                   ]
             
-        if ((model_name == "flaubert-base-uncased") or (model_name == "flaubert-base-cased")):
+        elif ((model_name == "flaubert-base-uncased") or (model_name == "flaubert-base-cased")):
     
             list_layers = [
                       model.flaubert_model.position_embeddings,
@@ -473,7 +483,7 @@ def training(
         
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             
-            
+        print(list_lr)
         for i in range(len(list_lr)):
             
             if isinstance(list_layers[i], list):
@@ -621,8 +631,9 @@ def training(
         criterion = MSELoss()
     elif loss == 'bce':
         # weights = torch.tensor(np.array(TRAING_WEIGIHT) / np.sum(TRAING_WEIGIHT) * 30, dtype=torch.float64).cuda()
-        weights = torch.tensor(np.array(TRAING_WEIGIHT), dtype=torch.float64).cuda()
-        criterion = nn.BCEWithLogitsLoss(weight=weights)
+        # weights = torch.tensor(np.array(TRAING_WEIGIHT), dtype=torch.float64).cuda()
+        # criterion = nn.BCEWithLogitsLoss(weight=weights)
+        criterion = nn.BCEWithLogitsLoss()
         criterion_extra = nn.BCEWithLogitsLoss()
     elif loss == 'mse-bce':
         criterion = MSEBCELoss()
@@ -658,7 +669,6 @@ def training(
         
         if extra_token:
             for tr_batch_i, (token_ids, seg_ids, labels, labels_category, labels_host) in enumerate(train_data_loader):
-        
                 rate = 0
                 for param_group in optimizer.param_groups:
                     rate += param_group['lr'] / len(optimizer.param_groups)
@@ -778,7 +788,6 @@ def training(
                         (valid_loss[0], spearman))
         else:
             for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
-    
                 rate = 0
                 for param_group in optimizer.param_groups:
                     rate += param_group['lr'] / len(optimizer.param_groups)
@@ -963,7 +972,9 @@ if __name__ == "__main__":
         raise NotImplementedError
 
     # start training
-    training(args.n_splits, \
+    training(
+            args.content, \
+            args.n_splits, \
             args.fold, \
             train_data_loader, \
             val_data_loader, \
