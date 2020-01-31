@@ -51,7 +51,7 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
-parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
+parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -159,7 +159,7 @@ def training(
     
     if augment:
         if extra_token:
-            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
+            checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + content + '-' + loss + '-' + \
                 optimizer_name + '-' + lr_scheduler_name + '-' + str(n_splits) + '-' + str(seed) + '-' + 'aug_differential_extra_token/')
         else:
             checkpoint_folder = os.path.join(checkpoint_folder, model_type + '/' + model_name + '-' + loss + '-' + \
