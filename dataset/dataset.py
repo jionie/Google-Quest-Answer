@@ -105,6 +105,16 @@ class QuestDataset(torch.utils.data.Dataset):
             self.tokenizer = BertTokenizer.from_pretrained(model_type,\
                 additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
             
+        elif((self.model_type == "flaubert-base-uncased")):
+            
+            self.tokenizer = FlaubertTokenizer.from_pretrained(model_type,\
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+            
+        elif((self.model_type == "flaubert-base-cased") or (self.model_type == "flaubert-large-cased")):
+            
+            self.tokenizer = FlaubertTokenizer.from_pretrained(model_type,\
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+            
         elif ((self.model_type == "xlnet-base-cased") \
             or (self.model_type == "xlnet-large-cased")):
             
@@ -501,6 +511,23 @@ class QuestDataset(torch.utils.data.Dataset):
             or (self.model_type == "bert-base-cased") \
             or (self.model_type == "bert-large-uncased") \
             or (self.model_type == "bert-large-cased")):
+
+            if self.content == "Question_Answer":
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            elif ((self.content == "Question") or (self.content == "Answer")):
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+            else:
+                raise NotImplementedError
+            
+        elif ((self.model_type == "flaubert-base-uncased") \
+            or (self.model_type == "flaubert-base-cased") \
+            or (self.model_type == "flaubert-large-cased")):
 
             if self.content == "Question_Answer":
                 if self.extra_token:

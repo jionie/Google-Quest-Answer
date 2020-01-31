@@ -269,7 +269,7 @@ def training(
                       model.fc
                       ]
             
-        elif (model_name == "bert-large-uncased"):
+        elif ((model_name == "bert-large-uncased") or (model_name == "bert-large-cased")):
         
             list_layers = [model.bert_model.embeddings,
                   model.bert_model.encoder.layer[0],
@@ -299,6 +299,62 @@ def training(
                   model.fc_1,
                   model.fc
                   ]
+            
+        if ((model_name == "flaubert-base-uncased") or (model_name == "flaubert-base-cased")):
+    
+            list_layers = [
+                      model.flaubert_model.position_embeddings,
+                      model.flaubert_model.embeddings,
+                      model.flaubert_model.layer_norm_emb,
+                      [model.flaubert_model.attentions[0], model.flaubert_model.layer_norm1[0],  model.flaubert_model.ffns[0], model.flaubert_model.layer_norm2[0]],
+                      [model.flaubert_model.attentions[1], model.flaubert_model.layer_norm1[1],  model.flaubert_model.ffns[1], model.flaubert_model.layer_norm2[1]],
+                      [model.flaubert_model.attentions[2], model.flaubert_model.layer_norm1[2],  model.flaubert_model.ffns[2], model.flaubert_model.layer_norm2[2]],
+                      [model.flaubert_model.attentions[3], model.flaubert_model.layer_norm1[3],  model.flaubert_model.ffns[3], model.flaubert_model.layer_norm2[3]],
+                      [model.flaubert_model.attentions[4], model.flaubert_model.layer_norm1[4],  model.flaubert_model.ffns[4], model.flaubert_model.layer_norm2[4]],
+                      [model.flaubert_model.attentions[5], model.flaubert_model.layer_norm1[5],  model.flaubert_model.ffns[5], model.flaubert_model.layer_norm2[5]],
+                      [model.flaubert_model.attentions[6], model.flaubert_model.layer_norm1[6],  model.flaubert_model.ffns[6], model.flaubert_model.layer_norm2[6]],
+                      [model.flaubert_model.attentions[7], model.flaubert_model.layer_norm1[7],  model.flaubert_model.ffns[7], model.flaubert_model.layer_norm2[7]],
+                      [model.flaubert_model.attentions[8], model.flaubert_model.layer_norm1[8],  model.flaubert_model.ffns[8], model.flaubert_model.layer_norm2[8]],
+                      [model.flaubert_model.attentions[9], model.flaubert_model.layer_norm1[9],  model.flaubert_model.ffns[9], model.flaubert_model.layer_norm2[9]],
+                      [model.flaubert_model.attentions[10], model.flaubert_model.layer_norm1[10],  model.flaubert_model.ffns[10], model.flaubert_model.layer_norm2[10]],
+                      [model.flaubert_model.attentions[11], model.flaubert_model.layer_norm1[11],  model.flaubert_model.ffns[11], model.flaubert_model.layer_norm2[11]],
+                      model.fc_1,
+                      model.fc
+                      ]
+            
+        elif ((model_name == "flaubert-large-cased")):
+        
+            list_layers = [
+                      model.flaubert_model.position_embeddings,
+                      model.flaubert_model.embeddings,
+                      model.flaubert_model.layer_norm_emb,
+                      [model.flaubert_model.attentions[0], model.flaubert_model.layer_norm1[0],  model.flaubert_model.ffns[0], model.flaubert_model.layer_norm2[0]],
+                      [model.flaubert_model.attentions[1], model.flaubert_model.layer_norm1[1],  model.flaubert_model.ffns[1], model.flaubert_model.layer_norm2[1]],
+                      [model.flaubert_model.attentions[2], model.flaubert_model.layer_norm1[2],  model.flaubert_model.ffns[2], model.flaubert_model.layer_norm2[2]],
+                      [model.flaubert_model.attentions[3], model.flaubert_model.layer_norm1[3],  model.flaubert_model.ffns[3], model.flaubert_model.layer_norm2[3]],
+                      [model.flaubert_model.attentions[4], model.flaubert_model.layer_norm1[4],  model.flaubert_model.ffns[4], model.flaubert_model.layer_norm2[4]],
+                      [model.flaubert_model.attentions[5], model.flaubert_model.layer_norm1[5],  model.flaubert_model.ffns[5], model.flaubert_model.layer_norm2[5]],
+                      [model.flaubert_model.attentions[6], model.flaubert_model.layer_norm1[6],  model.flaubert_model.ffns[6], model.flaubert_model.layer_norm2[6]],
+                      [model.flaubert_model.attentions[7], model.flaubert_model.layer_norm1[7],  model.flaubert_model.ffns[7], model.flaubert_model.layer_norm2[7]],
+                      [model.flaubert_model.attentions[8], model.flaubert_model.layer_norm1[8],  model.flaubert_model.ffns[8], model.flaubert_model.layer_norm2[8]],
+                      [model.flaubert_model.attentions[9], model.flaubert_model.layer_norm1[9],  model.flaubert_model.ffns[9], model.flaubert_model.layer_norm2[9]],
+                      [model.flaubert_model.attentions[10], model.flaubert_model.layer_norm1[10],  model.flaubert_model.ffns[10], model.flaubert_model.layer_norm2[10]],
+                      [model.flaubert_model.attentions[11], model.flaubert_model.layer_norm1[11],  model.flaubert_model.ffns[11], model.flaubert_model.layer_norm2[11]],
+                      [model.flaubert_model.attentions[12], model.flaubert_model.layer_norm1[12],  model.flaubert_model.ffns[12], model.flaubert_model.layer_norm2[12]],
+                      [model.flaubert_model.attentions[13], model.flaubert_model.layer_norm1[13],  model.flaubert_model.ffns[13], model.flaubert_model.layer_norm2[13]],
+                      [model.flaubert_model.attentions[14], model.flaubert_model.layer_norm1[14],  model.flaubert_model.ffns[14], model.flaubert_model.layer_norm2[14]],
+                      [model.flaubert_model.attentions[15], model.flaubert_model.layer_norm1[15],  model.flaubert_model.ffns[15], model.flaubert_model.layer_norm2[15]],
+                      [model.flaubert_model.attentions[16], model.flaubert_model.layer_norm1[16],  model.flaubert_model.ffns[16], model.flaubert_model.layer_norm2[16]],
+                      [model.flaubert_model.attentions[17], model.flaubert_model.layer_norm1[17],  model.flaubert_model.ffns[17], model.flaubert_model.layer_norm2[17]],
+                      [model.flaubert_model.attentions[18], model.flaubert_model.layer_norm1[18],  model.flaubert_model.ffns[18], model.flaubert_model.layer_norm2[18]],
+                      [model.flaubert_model.attentions[19], model.flaubert_model.layer_norm1[19],  model.flaubert_model.ffns[19], model.flaubert_model.layer_norm2[19]],
+                      [model.flaubert_model.attentions[20], model.flaubert_model.layer_norm1[20],  model.flaubert_model.ffns[20], model.flaubert_model.layer_norm2[20]],
+                      [model.flaubert_model.attentions[21], model.flaubert_model.layer_norm1[21],  model.flaubert_model.ffns[21], model.flaubert_model.layer_norm2[21]],
+                      [model.flaubert_model.attentions[22], model.flaubert_model.layer_norm1[22],  model.flaubert_model.ffns[22], model.flaubert_model.layer_norm2[22]],
+                      [model.flaubert_model.attentions[23], model.flaubert_model.layer_norm1[23],  model.flaubert_model.ffns[23], model.flaubert_model.layer_norm2[23]],
+                      model.fc_1,
+                      model.fc
+                      ]
             
         elif (model_name == "xlnet-base-cased"):
             
@@ -419,18 +475,35 @@ def training(
             
             
         for i in range(len(list_lr)):
+            
+            if isinstance(list_layers[i], list):
+                
+                for list_layer in list_layers[i]:
+                    layer_parameters = list(list_layer.named_parameters())
 
-            layer_parameters = list(list_layers[i].named_parameters())
+                    optimizer_grouped_parameters.append({ \
+                        'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                        'lr': list_lr[i], \
+                        'weight_decay': 0.01})
 
-            optimizer_grouped_parameters.append({ \
-                'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
-                'lr': list_lr[i], \
-                'weight_decay': 0.01})
+                    optimizer_grouped_parameters.append({ \
+                        'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                        'lr': list_lr[i], \
+                        'weight_decay': 0.0}) 
+                
+            else:
+            
+                layer_parameters = list(list_layers[i].named_parameters())
 
-            optimizer_grouped_parameters.append({ \
-                'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
-                'lr': list_lr[i], \
-                'weight_decay': 0.0}) 
+                optimizer_grouped_parameters.append({ \
+                    'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
+                    'lr': list_lr[i], \
+                    'weight_decay': 0.01})
+
+                optimizer_grouped_parameters.append({ \
+                    'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
+                    'lr': list_lr[i], \
+                    'weight_decay': 0.0}) 
             
         if extra_token:
             # add extra fcs

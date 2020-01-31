@@ -22,8 +22,24 @@ class QuestNet(nn.Module):
             self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
                                                     output_hidden_states=True)   
             self.hidden_size = 1024
+        elif model_type == "bert-large-cased":
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
+                                                    output_hidden_states=True)   
+            self.hidden_size = 1024
         elif model_type == "bert-base-cased":
             self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
+                                                    output_hidden_states=True)   
+            self.hidden_size = 768
+        elif model_type == "flaubert-base-cased":
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
+                                                    output_hidden_states=True)   
+            self.hidden_size = 768
+        elif model_type == "flaubert-large-cased":
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
+                                                    output_hidden_states=True)   
+            self.hidden_size = 1024
+        elif model_type == "flaubert-base-uncased":
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "xlnet-base-cased":
@@ -138,6 +154,26 @@ class QuestNet(nn.Module):
             # sequence_out = torch.unsqueeze(outputs[0][:, 0], dim=-1) # N * 512 * 768 * 1, hidden_states[-1]
             # 13 (embedding + 12 transformers) for base
             # 26 (embedding + 25 transformers) for large
+            
+            fuse_hidden = self.get_hidden_states_by_index(hidden_states, 0)
+            logits = self.get_logits_by_random_dropout(fuse_hidden, self.fc_1, self.fc)
+            
+            if self.extra_token:
+                fuse_hidden_category = self.get_hidden_states_by_index(hidden_states, 1)
+                fuse_hidden_host = self.get_hidden_states_by_index(hidden_states, 2)
+                
+                logits_category = self.get_logits_by_random_dropout(fuse_hidden_category, self.fc_1_category, self.fc_category)
+                logits_host = self.get_logits_by_random_dropout(fuse_hidden_host, self.fc_1_host, self.fc_host)
+                
+        elif ((self.model_type == "flaubert-base-cased") \
+            or (self.model_type == "flaubert-base-uncased") \
+            or (self.model_type == "flaubert-large-cased")):
+        
+            outputs = self.flaubert_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+            hidden_states = outputs[1]
+            
+            # last_hidden_out = outputs[0]
+            # mem = outputs[1], when config.mem_len > 0
             
             fuse_hidden = self.get_hidden_states_by_index(hidden_states, 0)
             logits = self.get_logits_by_random_dropout(fuse_hidden, self.fc_1, self.fc)
