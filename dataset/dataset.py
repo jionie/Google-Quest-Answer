@@ -23,6 +23,8 @@ parser.add_argument('-data_path', type=str, default="/media/jionie/my_disk/Kaggl
     required=False, help='specify the path for train.csv')
 parser.add_argument('-test_data_path', type=str, default="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
     required=False, help='specify the path for test.csv')
+parser.add_argument('-content', type=str, default="Question", \
+    required=False, help='specify the content for token')
 parser.add_argument('--n_splits', type=int, default=5, \
     required=False, help='specify the number of folds')
 parser.add_argument('--seed', type=int, default=42, \
@@ -79,13 +81,17 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
 ############################################ Define Dataset 
 
 class QuestDataset(torch.utils.data.Dataset):
-    def __init__(self, df, host_encoder=None, category_encoder=None, max_len=512, model_type="xlnet-base-uncased", train_mode=True, labeled=True, \
+    def __init__(self, df, host_encoder=None, category_encoder=None, max_len=512, \
+                model_type="xlnet-base-uncased", \
+                content="Question", \
+                train_mode=True, labeled=True, \
                 augment=True, extra_token=False):
         self.df = df
         self.max_len = max_len
         self.model_type = model_type
         self.train_mode = train_mode
         self.labeled = labeled
+        self.content = content
         
         # print(self.model_type)
         
@@ -210,6 +216,77 @@ class QuestDataset(torch.utils.data.Dataset):
             return tokens[:remove_start] + tokens[remove_start + num_remove:]
         else:
             return tokens[:max_num//2] + tokens[-(max_num - max_num//2):]
+        
+    def trim_input_single_content(self, title, content, max_sequence_length=512, 
+                t_max_len=30, c_max_len=512-30-4, num_token=3):
+
+        if self.augment:
+            title = self.augmentation(title, insert=False, substitute=True, swap=False, delete=True)
+            content = self.augmentation(content, insert=False, substitute=True, swap=False, delete=True)
+
+        t = self.tokenizer.tokenize(title)
+        c = self.tokenizer.tokenize(content)
+
+        t_len = len(t)
+        c_len = len(c)
+
+        if (t_len+c_len+num_token) > max_sequence_length:
+
+            if t_max_len > t_len:
+                t_new_len = t_len
+                c_max_len = c_max_len + floor((t_max_len - t_len)/2)
+            else:
+                t_new_len = t_max_len
+
+            if c_max_len > c_len:
+                c_new_len = c_len 
+            else:
+                c_new_len = c_max_len
+
+
+            if t_new_len+c_new_len+num_token > max_sequence_length:
+                raise ValueError("New sequence length should be less or equal than %d, but is %d" 
+                                 % (max_sequence_length, (t_new_len+c_new_len+num_token)))
+
+            if self.augment:
+                # random select
+                if random.random() < self.random_select_date:
+                    if len(t) - t_new_len > 0:
+                        t_start = np.random.randint(0, len(t) - t_new_len)
+                    else:
+                        t_start = 0
+
+                    if len(c) - c_new_len > 0:
+                        c_start = np.random.randint(0, len(c) - c_new_len)
+                    else:
+                        c_start = 0
+
+                    t = t[t_start : (t_start + t_new_len)]
+                    c = c[c_start : (c_start + c_new_len)]
+                    
+                else:
+                    # truncate
+                    if len(t) - t_new_len > 0:
+                        t = t[:t_new_len//4] + t[len(t)-t_new_len+t_new_len//4:]
+                    else:
+                        t = t[:t_new_len]
+
+                    if len(c) - c_new_len > 0:
+                        c = c[:c_new_len//4] + c[len(c)-c_new_len+c_new_len//4:]
+                    else:
+                        c = c[:c_new_len]
+
+            else:
+    
+                t = t[:t_new_len]
+                c = c[:c_new_len]
+
+        # some bad cases
+        if (len(t) + len(c) + num_token > max_sequence_length):
+            more_token = len(t) + len(c) + num_token - max_sequence_length
+            c = c[:(len(c)-more_token)]
+        
+        return t, c
 
     def trim_input(self, title, question, answer, max_sequence_length=512, 
                 t_max_len=30, q_max_len=int((512-30-4)/2), a_max_len=(512-30-4 - int((512-30-4)/2)), num_token=4):
@@ -230,7 +307,7 @@ class QuestDataset(torch.utils.data.Dataset):
         q_len = len(q)
         a_len = len(a)
 
-        if (t_len+q_len+a_len+4) > max_sequence_length:
+        if (t_len+q_len+a_len+num_token) > max_sequence_length:
 
             if t_max_len > t_len:
                 t_new_len = t_len
@@ -250,8 +327,8 @@ class QuestDataset(torch.utils.data.Dataset):
                 q_new_len = q_max_len
 
 
-            if t_new_len+a_new_len+q_new_len+num_token != max_sequence_length:
-                raise ValueError("New sequence length should be %d, but is %d" 
+            if t_new_len+a_new_len+q_new_len+num_token > max_sequence_length:
+                raise ValueError("New sequence length should be less or equal than %d, but is %d" 
                                  % (max_sequence_length, (t_new_len+a_new_len+q_new_len+num_token)))
 
             if self.augment:
@@ -312,11 +389,27 @@ class QuestDataset(torch.utils.data.Dataset):
             num_token = 6
         else:
             num_token = 4
-            
-        t_max_len=30
-        q_max_len=int((self.max_len-t_max_len-num_token)/2)
-        a_max_len=(self.max_len-t_max_len - num_token - int((self.max_len-t_max_len-num_token)/2))
-        # print(t_max_len, q_max_len, a_max_len)
+        
+        if self.content == "Question":
+            num_token -= 1
+        elif self.content == "Answer":
+            num_token -= 1
+        
+        if self.content == "Question_Answer":   
+            t_max_len=30
+            q_max_len=int((self.max_len-t_max_len-num_token)/2)
+            a_max_len=(self.max_len-t_max_len - num_token - int((self.max_len-t_max_len-num_token)/2))
+        elif self.content == "Question":
+            t_max_len=30
+            q_max_len=self.max_len-t_max_len-num_token
+            a_max_len=0
+        elif self.content == "Answer":
+            t_max_len=30
+            q_max_len=0
+            a_max_len=self.max_len-t_max_len-num_token  
+        else:
+            raise NotImplementedError
+
         
         if self.augment:
             
@@ -370,45 +463,92 @@ class QuestDataset(torch.utils.data.Dataset):
             if not isinstance(answer, str):
                 if np.isnan(answer):
                     answer = row.answer
-        
-            t_tokens, q_tokens, a_tokens = self.trim_input(title, question, answer, max_sequence_length=self.max_len, \
-                t_max_len=t_max_len, q_max_len=q_max_len, a_max_len=a_max_len, num_token=num_token)
+
+            if self.content == "Question_Answer":
+                t_tokens, q_tokens, a_tokens = self.trim_input(title, question, answer, max_sequence_length=self.max_len, \
+                    t_max_len=t_max_len, q_max_len=q_max_len, a_max_len=a_max_len, num_token=num_token)
+            elif self.content == "Question":
+                t_tokens, c_tokens = self.trim_input_single_content(title, question, max_sequence_length=self.max_len, \
+                    t_max_len=t_max_len, c_max_len=q_max_len, num_token=num_token)
+            elif self.content == "Answer":
+                t_tokens, c_tokens = self.trim_input_single_content(title, answer, max_sequence_length=self.max_len, \
+                    t_max_len=t_max_len, c_max_len=a_max_len, num_token=num_token)
+            else:
+                raise NotImplementedError
             
         else:
             t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer, \
                 max_sequence_length=self.max_len, \
                 t_max_len=t_max_len, q_max_len=q_max_len, a_max_len=a_max_len, num_token=num_token)
+            
+            if self.content == "Question_Answer":
+                t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer, \
+                    max_sequence_length=self.max_len, \
+                    t_max_len=t_max_len, q_max_len=q_max_len, a_max_len=a_max_len, num_token=num_token)
+            elif self.content == "Question":
+                t_tokens, c_tokens = self.trim_input_single_content(row.question_title, row.question_body, \
+                    max_sequence_length=self.max_len, \
+                    t_max_len=t_max_len, c_max_len=q_max_len, num_token=num_token)
+            elif self.content == "Answer":
+                t_tokens, c_tokens = self.trim_input_single_content(row.question_title, row.answer, \
+                    
+                    max_sequence_length=self.max_len, \
+                    t_max_len=t_max_len, c_max_len=a_max_len, num_token=num_token)
+            else:
+                raise NotImplementedError
 
         if ((self.model_type == "bert-base-uncased") \
             or (self.model_type == "bert-base-cased") \
             or (self.model_type == "bert-large-uncased") \
             or (self.model_type == "bert-large-cased")):
-    
-            if self.extra_token:
-                # tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
-                tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+
+            if self.content == "Question_Answer":
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            elif ((self.content == "Question") or (self.content == "Answer")):
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
             else:
-                tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                raise NotImplementedError
+                
             
         elif ((self.model_type == "xlnet-base-cased") \
             or (self.model_type == "xlnet-large-cased")):
             
-            if self.extra_token:
-                # tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
-                tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            if self.content == "Question_Answer":
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            elif ((self.content == "Question") or (self.content == "Answer")):
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
             else:
-                tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                raise NotImplementedError
             
         elif ((self.model_type == "albert-base-v2") \
             or (self.model_type == "albert-large-v2") \
             or (self.model_type == "albert-xlarge-v2") \
             or (self.model_type == "albert-xxlarge-v2")):
             
-            if self.extra_token:
-                # tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
-                tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            if self.content == "Question_Answer":
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            elif ((self.content == "Question") or (self.content == "Answer")):
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
             else:
-                tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                raise NotImplementedError
             
         else:
             
@@ -460,11 +600,12 @@ class QuestDataset(torch.utils.data.Dataset):
 def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
     max_len=512, \
     model_type="bert-base-uncased", \
+    content="Question", \
     batch_size=4, \
     extra_token=True):
     
     ds_test = QuestDataset(test_df, None, None, max_len, \
-        model_type, train_mode=False, labeled=False, augment=False, extra_token=extra_token)
+        model_type, content=content, train_mode=False, labeled=False, augment=False, extra_token=extra_token)
     loader = torch.utils.data.DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=ds_test.collate_fn, drop_last=False)
     loader.num = len(test_df)
     
@@ -498,6 +639,7 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
                         category_encoder=None, \
                         max_len=512, \
                         model_type="bert-base-uncased", \
+                        content="Question", \
                         batch_size=4, \
                         val_batch_size=4, \
                         num_workers=2, \
@@ -512,12 +654,12 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
     print(df_val.shape)
 
     ds_train = QuestDataset(df_train, host_encoder, category_encoder, max_len, \
-        model_type, train_mode=True, labeled=True, augment=augment, extra_token=extra_token)
+        model_type, content=content, train_mode=True, labeled=True, augment=augment, extra_token=extra_token)
     train_loader = torch.utils.data.DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=ds_train.collate_fn, drop_last=True)
     train_loader.num = len(df_train)
 
     ds_val = QuestDataset(df_val, host_encoder, category_encoder, max_len, \
-        model_type, train_mode=False, labeled=True, augment=False, extra_token=extra_token)
+        model_type, content=content, train_mode=False, labeled=True, augment=False, extra_token=extra_token)
     val_loader = torch.utils.data.DataLoader(ds_val, batch_size=val_batch_size, shuffle=False, num_workers=num_workers, collate_fn=ds_val.collate_fn, drop_last=False)
     val_loader.num = len(df_val)
     val_loader.df = df_val
@@ -548,6 +690,7 @@ def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest
                      host_encoder=None, \
                      category_encoder=None, \
                      model_type="bert-base-uncased", \
+                     content="Question", \
                      batch_size=4, \
                      val_batch_size=4, \
                      num_workers=2, \
@@ -558,6 +701,7 @@ def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest
                      host_encoder=host_encoder, \
                      category_encoder=category_encoder, \
                      model_type=model_type, \
+                     content=content, \
                      batch_size=batch_size, \
                      val_batch_size=val_batch_size, \
                      num_workers=num_workers, \
@@ -608,11 +752,13 @@ def test_train_loader(train_data_path="/media/jionie/my_disk/Kaggle/Google_Quest
 
 def test_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/test.csv", \
                      model_type="bert-base-uncased", \
+                     content="Question", \
                      batch_size=4, \
                      extra_token=True):
 
     loader = get_test_loader(data_path=data_path, \
                             model_type=model_type, \
+                            content=content, \
                             batch_size=batch_size, \
                             extra_token=extra_token)
 
@@ -658,6 +804,7 @@ if __name__ == "__main__":
                       host_encoder=host_encoder, \
                       category_encoder=category_encoder, \
                       model_type=args.model_type, \
+                      content=args.content, \
                       batch_size=args.batch_size, \
                       val_batch_size=args.val_batch_size, \
                       num_workers=args.num_workers)
@@ -665,6 +812,7 @@ if __name__ == "__main__":
     # test test_data_loader
     test_test_loader(data_path=args.test_data_path, \
                      model_type=args.model_type, \
+                     content=args.content, \
                      batch_size=args.val_batch_size)
     
     
@@ -673,6 +821,7 @@ if __name__ == "__main__":
                       host_encoder=host_encoder, \
                       category_encoder=category_encoder, \
                       model_type=args.model_type, \
+                      content=args.content, \
                       batch_size=args.batch_size, \
                       val_batch_size=args.val_batch_size, \
                       num_workers=args.num_workers, \
@@ -681,5 +830,6 @@ if __name__ == "__main__":
     # test test_data_loader
     test_test_loader(data_path=args.test_data_path, \
                      model_type=args.model_type, \
+                     content=args.content, \
                      batch_size=args.val_batch_size, \
                       extra_token=False)
