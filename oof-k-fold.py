@@ -327,8 +327,6 @@ def postprocessing(oof_df, target_columns):
         
         oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
     
-    
-    
     ################################################# handle type 2 columns      
     type_two_column_list = [
         'question_type_spelling'
@@ -363,15 +361,15 @@ def postprocessing(oof_df, target_columns):
     oof_df[type_three_column_list] = scaler.fit_transform(oof_df[type_three_column_list])
     
     for column in type_three_column_list:
-        oof_df.loc[oof_df[column] <= 0.385, column] = -0.333333
-        oof_df.loc[(oof_df[column] > 0.385) & (oof_df[column] <= 0.47), column] = -0.444444
-        oof_df.loc[(oof_df[column] > 0.47) & (oof_df[column] <= 0.525), column] = -0.5
-        oof_df.loc[(oof_df[column] > 0.525) & (oof_df[column] <= 0.605), column] = -0.555556
-        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = -0.666667
-        oof_df.loc[(oof_df[column] > 0.605) & (oof_df[column] <= 0.715), column] = -0.777778
-        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.8), column] = -0.833333
-        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.94), column] = -0.888889
-        oof_df.loc[(oof_df[column] > 0.94), column] = -1
+        oof_df.loc[oof_df[column] <= 0.388889, column] = -0.333333
+        oof_df.loc[(oof_df[column] > 0.388889) & (oof_df[column] <= 0.472222), column] = -0.444444
+        oof_df.loc[(oof_df[column] > 0.472222) & (oof_df[column] <= 0.527778), column] = -0.5
+        oof_df.loc[(oof_df[column] > 0.527778) & (oof_df[column] <= 0.611111), column] = -0.555556
+        oof_df.loc[(oof_df[column] > 0.611111) & (oof_df[column] <= 0.722222), column] = -0.666667
+        oof_df.loc[(oof_df[column] > 0.722222) & (oof_df[column] <= 0.805556), column] = -0.777778
+        oof_df.loc[(oof_df[column] > 0.805556) & (oof_df[column] <= 0.861111), column] = -0.833333
+        oof_df.loc[(oof_df[column] > 0.861111) & (oof_df[column] <= 0.944445), column] = -0.888889
+        oof_df.loc[(oof_df[column] > 0.944445), column] = -1
         
         oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
         
@@ -385,23 +383,23 @@ def postprocessing(oof_df, target_columns):
     
     for column in type_four_column_list:
         
-        oof_df.loc[oof_df[column] <= 0.233, column] = -0.200000
-        oof_df.loc[(oof_df[column] > 0.233) & (oof_df[column] <= 0.283), column] = -0.266667
-        oof_df.loc[(oof_df[column] > 0.283) & (oof_df[column] <= 0.315), column] = -0.300000
-        oof_df.loc[(oof_df[column] > 0.315) & (oof_df[column] <= 0.365), column] = -0.333333
-        oof_df.loc[(oof_df[column] > 0.365) & (oof_df[column] <= 0.433), column] = -0.400000
-        oof_df.loc[(oof_df[column] > 0.433) & (oof_df[column] <= 0.483), column] = -0.466667
-        oof_df.loc[(oof_df[column] > 0.483) & (oof_df[column] <= 0.517), column] = -0.500000
-        oof_df.loc[(oof_df[column] > 0.517) & (oof_df[column] <= 0.567), column] = -0.533333
-        oof_df.loc[(oof_df[column] > 0.567) & (oof_df[column] <= 0.633), column] = -0.600000
-        oof_df.loc[(oof_df[column] > 0.633) & (oof_df[column] <= 0.683), column] = -0.666667
-        oof_df.loc[(oof_df[column] > 0.683) & (oof_df[column] <= 0.715), column] = -0.700000
-        oof_df.loc[(oof_df[column] > 0.715) & (oof_df[column] <= 0.767), column] = -0.733333
-        oof_df.loc[(oof_df[column] > 0.767) & (oof_df[column] <= 0.833), column] = -0.800000
-        oof_df.loc[(oof_df[column] > 0.833) & (oof_df[column] <= 0.883), column] = -0.866667
-        oof_df.loc[(oof_df[column] > 0.883) & (oof_df[column] <= 0.915), column] = -0.900000
-        oof_df.loc[(oof_df[column] > 0.915) & (oof_df[column] <= 0.967), column] = -0.933333
-        oof_df.loc[(oof_df[column] > 0.967), column] = -1
+        oof_df.loc[oof_df[column] <= 0.233333, column] = -0.200000
+        oof_df.loc[(oof_df[column] > 0.233333) & (oof_df[column] <= 0.283333), column] = -0.266667
+        oof_df.loc[(oof_df[column] > 0.283333) & (oof_df[column] <= 0.316666), column] = -0.300000
+        oof_df.loc[(oof_df[column] > 0.316666) & (oof_df[column] <= 0.366666), column] = -0.333333
+        oof_df.loc[(oof_df[column] > 0.366666) & (oof_df[column] <= 0.433333), column] = -0.400000
+        oof_df.loc[(oof_df[column] > 0.433333) & (oof_df[column] <= 0.483333), column] = -0.466667
+        oof_df.loc[(oof_df[column] > 0.483333) & (oof_df[column] <= 0.516666), column] = -0.500000
+        oof_df.loc[(oof_df[column] > 0.516666) & (oof_df[column] <= 0.566666), column] = -0.533333
+        oof_df.loc[(oof_df[column] > 0.566666) & (oof_df[column] <= 0.633333), column] = -0.600000
+        oof_df.loc[(oof_df[column] > 0.633333) & (oof_df[column] <= 0.683333), column] = -0.666667
+        oof_df.loc[(oof_df[column] > 0.683333) & (oof_df[column] <= 0.716666), column] = -0.700000
+        oof_df.loc[(oof_df[column] > 0.716666) & (oof_df[column] <= 0.766666), column] = -0.733333
+        oof_df.loc[(oof_df[column] > 0.767666) & (oof_df[column] <= 0.833333), column] = -0.800000
+        oof_df.loc[(oof_df[column] > 0.833333) & (oof_df[column] <= 0.883333), column] = -0.866667
+        oof_df.loc[(oof_df[column] > 0.883333) & (oof_df[column] <= 0.916666), column] = -0.900000
+        oof_df.loc[(oof_df[column] > 0.916666) & (oof_df[column] <= 0.966666), column] = -0.933333
+        oof_df.loc[(oof_df[column] > 0.966666), column] = -1
         
         oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
     

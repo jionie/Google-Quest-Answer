@@ -1,0 +1,16 @@
+oof_spearman :0.417251
+
+oof_spearman increase from 0.417251 to  0.417772
+
+oof_spearman increase from 0.417772 to  0.417894
+
+oof_spearman increase from 0.417894 to  0.418033
+
+oof_spearman increase from 0.418033 to  0.418139
+
+oof_spearman increase from 0.418139 to  0.418339
+
+oof_spearman increase from 0.418339 to  0.418360
+
+oof_spearman increase from 0.418360 to  0.418396
+
