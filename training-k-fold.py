@@ -51,7 +51,7 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
+parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -81,7 +81,7 @@ NUM_CATEGORY_CLASS=5
 NUM_HOST_CLASS=64
 AUXILIARY_WEIGHTs = [1, 0.05, 0.05]
 DECAY_FACTOR = 0.95
-MIN_LR = 1.5e-6
+MIN_LR = 2e-6
 # UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
 #                   1, 2, 2, 4, 1, 2, \
 #                   4, 4, 4, 4, 1, 2, \

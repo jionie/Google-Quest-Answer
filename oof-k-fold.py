@@ -48,9 +48,11 @@ parser.add_argument("--train_data_folder", type=str, default="/media/jionie/my_d
     required=False, help="specify the folder for training data")
 parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
+parser.add_argument('--content', type=str, default="Question", \
+    required=False, help='specify the content for token')
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
-parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
+parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -64,12 +66,13 @@ parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_d
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
 parser.add_argument('--n_splits', type=int, default=5, required=True, help="specify the n_splits for training")
 parser.add_argument('--augment', action='store_true', help="specify whether augmentation for training")
+parser.add_argument('--merge', action='store_true', help="specify whether to merge oof of question and answer")
+parser.add_argument('--extra_token', action='store_true', default=False, help='whether to use extra token for extra tasks')
 
 
 
 ############################################################################## Define Constant
-NUM_CLASS = 30
-TARGET_COLUMNS = ['question_asker_intent_understanding',
+QUESTION_TARGET_COLUMNS = ['question_asker_intent_understanding',
                 'question_body_critical',
                 'question_conversational',
                 'question_expect_short_answer',
@@ -90,6 +93,9 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
                 'question_type_reason_explanation',
                 'question_type_spelling',
                 'question_well_written',
+                ]
+
+ANSWER_TARGET_COLUMNS = [
                 'answer_helpful',
                 'answer_level_of_information',
                 'answer_plausible',
@@ -99,6 +105,8 @@ TARGET_COLUMNS = ['question_asker_intent_understanding',
                 'answer_type_procedure',
                 'answer_type_reason_explanation',
                 'answer_well_written']
+
+TARGET_COLUMNS = QUESTION_TARGET_COLUMNS + ANSWER_TARGET_COLUMNS
 
 
 ############################################################################## seed All
@@ -117,6 +125,7 @@ def seed_everything(seed=42):
 def get_oof(
             n_splits,
             fold,
+            content,
             val_data_loader,
             model_type,
             model_name,
@@ -158,6 +167,15 @@ def get_oof(
 
 
     ############################################################################### model
+    if content == "Question_Answer":
+        NUM_CLASS = 30
+    elif content == "Question":
+        NUM_CLASS = 21
+    elif content == "Answer":
+        NUM_CLASS = 9
+    else:
+        raise NotImplementedError
+    
     if model_type == "bert":
         model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
     elif model_type == "xlnet":
@@ -221,7 +239,9 @@ def get_oof(
 def generate_oof_files(train_data_folder, \
                        n_splits, \
                        seed, \
-                       checkpoint_folder
+                       checkpoint_folder, \
+                       target_columns, \
+                       content
                        ):
     
     for fold in range(n_splits):
@@ -230,7 +250,7 @@ def generate_oof_files(train_data_folder, \
         val_df = pd.read_csv(val_data_path)
         pred_val = np.load(checkpoint_folder + 'probability_pred_fold_' + str(fold) + '.uint8.npz')['arr_0']
         
-        val_df[TARGET_COLUMNS] = pred_val
+        val_df[target_columns] = pred_val
         
         if fold == 0:
             oof = val_df.copy()
@@ -240,18 +260,19 @@ def generate_oof_files(train_data_folder, \
     for column in ["Unnamed: 0", "Unnamed: 0.1"]:
         if column in oof.columns:
             oof = oof.drop([column], axis=1)
-            
+    save_columns = ["qa_id"]+target_columns
+    oof = oof[save_columns]      
     oof = oof.sort_values(by="qa_id")
-    oof.to_csv(checkpoint_folder + '/oof.csv')
+    oof.to_csv(checkpoint_folder + '/oof_' + content + '.csv')
     
     return
 
 
-def get_spearman(train_df, oof_df, checkpoint_folder):
+def get_spearman(train_df, oof_df, checkpoint_folder, target_columns):
     
-    # oof_df = postprocessing(oof_df)
+    oof_df = postprocessing(oof_df, target_columns)
 
-    spearman = Spearman(train_df[TARGET_COLUMNS].values, oof_df[TARGET_COLUMNS].values)
+    spearman = Spearman(train_df[target_columns].values, oof_df[target_columns].values)
     
     log = Logger()
     log.open(os.path.join(checkpoint_folder, 'in_fold_validartion.txt'), mode='a+')
@@ -261,7 +282,7 @@ def get_spearman(train_df, oof_df, checkpoint_folder):
     
     return
 
-def postprocessing(oof_df):
+def postprocessing(oof_df, target_columns):
     
     scaler = MinMaxScaler()
     
@@ -386,9 +407,9 @@ def postprocessing(oof_df):
     
     
     ################################################# round to i / 90 (i from 0 to 90)
-    oof_values = oof_df[TARGET_COLUMNS].values
+    oof_values = oof_df[target_columns].values
     oof_values = np.around(oof_values * 90) / 90
-    oof_df[TARGET_COLUMNS] = oof_values
+    oof_df[target_columns] = oof_values
     
     return oof_df
 
@@ -402,11 +423,28 @@ if __name__ == "__main__":
     
     
     if args.augment:
-        checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_type + '/' +args. model_name + '-' + args.loss + '-' + \
-        args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'aug_differential_relu/')
+        if args.extra_token:
+            checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-' + args.content + '-' + args.loss + '-' + \
+                args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'aug_differential_extra_token/')
+        else:
+            checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-' + args.content + '-' + args.loss + '-' + \
+                args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'aug_differential/')
     else:
-        checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_type + '/' +args. model_name + '-' + args.loss + '-' + \
-        args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '/')
+        if args.extra_token:
+            checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-' + args.content + '-' + args.loss + '-' + \
+                args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'extra_token/')
+        else:
+            checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-' + args.content + '-' + args.loss + '-' + \
+                args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + '/')
+    
+    if args.content == "Question_Answer":
+        target_columns = TARGET_COLUMNS
+    elif args.content == "Question":
+        target_columns = QUESTION_TARGET_COLUMNS
+    elif args.content == "Answer":
+        target_columns = ANSWER_TARGET_COLUMNS
+    else:
+        raise NotImplementedError
     
     # get oof
     
@@ -420,6 +458,7 @@ if __name__ == "__main__":
     #         _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
     #                                                     val_data_path=val_data_path, \
     #                                                     model_type=args.model_name, \
+    #                                                       content=args.content, \
     #                                                     batch_size=args.batch_size, \
     #                                                     val_batch_size=args.valid_batch_size, \
     #                                                     num_workers=args.num_workers, \
@@ -442,11 +481,55 @@ if __name__ == "__main__":
     generate_oof_files(args.train_data_folder, \
                        args.n_splits, \
                        args.seed, \
-                       checkpoint_folder)
+                       checkpoint_folder, \
+                       target_columns, \
+                       args.content)
     
     train_df = pd.read_csv(args.train_data_folder + "train.csv")
     oof_df = pd.read_csv(checkpoint_folder + "/oof.csv")
     
-    get_spearman(train_df, oof_df, checkpoint_folder)
+    get_spearman(train_df, oof_df, checkpoint_folder, target_columns)
+    
+    if args.merge:
+        if args.augment:
+            if args.extra_token:
+                checkpoint_folder_question = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Question-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'aug_differential_extra_token/')
+            else:
+                checkpoint_folder_question = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Question-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'aug_differential/')
+        else:
+            if args.extra_token:
+                checkpoint_folder_question = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Question-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'extra_token/')
+            else:
+                checkpoint_folder_question = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Question-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + '/')
+                
+        oof_question = pd.read_csv(checkpoint_folder_question + "oof_Question.csv")
+        
+        if args.augment:
+            if args.extra_token:
+                checkpoint_folder_answer = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Answer-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'aug_differential_extra_token/')
+            else:
+                checkpoint_folder_answer = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Answer-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'aug_differential/')
+        else:
+            if args.extra_token:
+                checkpoint_folder_answer = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Answer-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + 'extra_token/')
+            else:
+                checkpoint_folder_answer = os.path.join(args.checkpoint_folder, args.model_type + '/' + args.model_name + '-Answer-' + args.loss + '-' + \
+                    args.optimizer + '-' + args.lr_scheduler + '-' + str(args.n_splits) + '-' + str(args.seed) + '-' + '/')
+                
+        oof_answer = pd.read_csv(checkpoint_folder_answer + "oof_Answer.csv")
+        
+        oof_df = pd.concat([oof_question[QUESTION_TARGET_COLUMNS], oof_answer[ANSWER_TARGET_COLUMNS]], axis=1)
+        oof_df['qa_id'] = oof_question['qa_id']
+        
+        get_spearman(train_df, oof_df, checkpoint_folder, TARGET_COLUMNS)
+        
+        oof_df.to_csv(checkpoint_folder_answer + "oof_Question_Answer.csv")
 
     gc.collect()
