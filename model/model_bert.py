@@ -31,15 +31,15 @@ class QuestNet(nn.Module):
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "flaubert-base-cased":
-            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0, \
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "flaubert-large-cased":
-            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0, \
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
                                                     output_hidden_states=True)   
             self.hidden_size = 1024
         elif model_type == "flaubert-base-uncased":
-            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0, \
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "xlnet-base-cased":

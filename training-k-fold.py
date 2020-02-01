@@ -55,7 +55,7 @@ parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], 
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
-parser.add_argument("--warmup_proportion",  type=float, default=0.001, required=False, \
+parser.add_argument("--warmup_proportion",  type=float, default=0.05, required=False, \
     help="Proportion of training to perform linear learning rate warmup for. " "E.g., 0.1 = 10%% of training.")
 parser.add_argument("--lr", type=float, default=3e-5, required=False, help="specify the initial learning rate for training")
 parser.add_argument("--batch_size", type=int, default=8, required=False, help="specify the batch size for training")
@@ -81,7 +81,7 @@ NUM_CATEGORY_CLASS=5
 NUM_HOST_CLASS=64
 AUXILIARY_WEIGHTs = [1, 0.05, 0.05]
 DECAY_FACTOR = 0.95
-MIN_LR = 2e-6
+MIN_LR = 1.5e-6
 # UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
 #                   1, 2, 2, 4, 1, 2, \
 #                   4, 4, 4, 4, 1, 2, \
@@ -94,7 +94,13 @@ UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, \
                      1, 1, 1, 1, 1, 1, \
                      1, 1, 1, 1, 1, 1]
 
-TRAING_WEIGIHT = [i for i in UNBALANCE_WEIGIHT]
+QUESTION_UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, \
+                     1, 1, 1, 2, 1, 1, \
+                     2, 2, 2, 2, 1, 1, \
+                     1, 1, 1]
+
+ANSWER_UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+
 # 1 is balanced, 2 is unbalanced, 3 is extremely unbalanced
 
 
@@ -194,13 +200,14 @@ def training(
         pretrain_state_dict = torch.load(pretrain_file)
         state_dict = model.state_dict()
         keys = list(state_dict.keys())
+        print(keys)
         for key in keys:
             if any(s in key for s in skip): continue
             try:
                 state_dict[key] = pretrain_state_dict[key]
             except:
                 print(key)
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
         
         return model
 
@@ -252,7 +259,10 @@ def training(
     model = model.cuda()
     
     if load_pretrain:
-        load(model, checkpoint_filepath)
+        if content == "Answer":
+            model = load(model, checkpoint_filepath, skip=['fc.weight', 'fc.bias'])
+        else:
+            model = load(model, checkpoint_filepath)
 
     ############################################################################### optimizer
     if ((model_type == "bert") or (model_type == "xlnet")) :
@@ -630,10 +640,15 @@ def training(
     if loss == 'mse':
         criterion = MSELoss()
     elif loss == 'bce':
-        # weights = torch.tensor(np.array(TRAING_WEIGIHT) / np.sum(TRAING_WEIGIHT) * 30, dtype=torch.float64).cuda()
-        # weights = torch.tensor(np.array(TRAING_WEIGIHT), dtype=torch.float64).cuda()
-        # criterion = nn.BCEWithLogitsLoss(weight=weights)
-        criterion = nn.BCEWithLogitsLoss()
+        if content == "Question_Answer":
+            weights = torch.tensor(np.array(UNBALANCE_WEIGIHT), dtype=torch.float64).cuda()
+        elif content == "Question":
+            weights = torch.tensor(np.array(QUESTION_UNBALANCE_WEIGIHT), dtype=torch.float64).cuda()
+        elif content == "Answer":
+            weights = torch.tensor(np.array(ANSWER_UNBALANCE_WEIGIHT), dtype=torch.float64).cuda()
+        else:
+            raise NotImplementedError
+        criterion = nn.BCEWithLogitsLoss(weight=weights)
         criterion_extra = nn.BCEWithLogitsLoss()
     elif loss == 'mse-bce':
         criterion = MSEBCELoss()
