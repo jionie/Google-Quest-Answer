@@ -51,6 +51,7 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
+parser.add_argument("--max_len", type=int, default=512, required=False, help="specify the max_len of tokens")
 parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
@@ -964,6 +965,7 @@ if __name__ == "__main__":
                                                         val_data_path=val_data_path, \
                                                         host_encoder=host_encoder, \
                                                         category_encoder=category_encoder, \
+                                                        max_len=args.max_len, \
                                                         model_type=args.model_name, \
                                                         content=args.content, \
                                                         batch_size=args.batch_size, \
@@ -978,6 +980,7 @@ if __name__ == "__main__":
                                                         val_data_path=val_data_path, \
                                                         model_type=args.model_name, \
                                                         content=args.content, \
+                                                        max_len=args.max_len, \
                                                         batch_size=args.batch_size, \
                                                         val_batch_size=args.valid_batch_size, \
                                                         num_workers=args.num_workers, \

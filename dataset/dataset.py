@@ -86,7 +86,7 @@ TARGET_COLUMNS = QUESTION_TARGET_COLUMNS + ANSWER_TARGET_COLUMNS
 ############################################ Define Dataset 
 
 class QuestDataset(torch.utils.data.Dataset):
-    def __init__(self, df, host_encoder=None, category_encoder=None, max_len=768, \
+    def __init__(self, df, host_encoder=None, category_encoder=None, max_len=512, \
                 model_type="xlnet-base-uncased", \
                 content="Question", \
                 train_mode=True, labeled=True, \
@@ -692,7 +692,7 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
                         val_data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/split/train_fold_0_seed_42.csv", \
                         host_encoder=None, \
                         category_encoder=None, \
-                        max_len=768, \
+                        max_len=512, \
                         model_type="bert-base-uncased", \
                         content="Question", \
                         batch_size=4, \

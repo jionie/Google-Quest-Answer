@@ -50,6 +50,7 @@ parser.add_argument('--model_type', type=str, default="bert", \
     required=False, help='specify the model_type for BertTokenizer and Net')
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
+parser.add_argument("--max_len", type=int, default=512, required=False, help="specify the max_len of tokens")
 parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
     required=False, help='specify the model_name for BertTokenizer and Net')
 parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
@@ -456,7 +457,8 @@ if __name__ == "__main__":
     #         _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
     #                                                     val_data_path=val_data_path, \
     #                                                     model_type=args.model_name, \
-    #                                                       content=args.content, \
+    #                                                     content=args.content, \
+    #                                                     max_len=args.max_len, \
     #                                                     batch_size=args.batch_size, \
     #                                                     val_batch_size=args.valid_batch_size, \
     #                                                     num_workers=args.num_workers, \
