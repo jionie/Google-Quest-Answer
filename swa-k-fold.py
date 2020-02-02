@@ -52,7 +52,7 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
 parser.add_argument("--max_len", type=int, default=512, required=False, help="specify the max_len of tokens")
-parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
+parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -648,6 +648,11 @@ def training(
         raise NotImplementedError
     
     for epoch in range(1, num_epoch+1):
+        
+        # save last epoch weights
+        checkpoint_filename_last_epoch = 'fold_' + str(fold) + "_checkpoint_last_epoch.pth"
+        checkpoint_filepath_last_epoch = os.path.join(checkpoint_folder, checkpoint_filename_last_epoch)
+        torch.save(model.state_dict(), checkpoint_filepath_last_epoch)
 
         # init in-epoch statistics
         labels_train = None
@@ -901,13 +906,24 @@ def training(
 
         val_metric_epoch = spearman
             
-        epoch_checkpoint_filename = 'fold_' + str(fold) + "_" + str(epoch) +"_checkpoint.pth"
-        epoch_checkpoint_filepath = os.path.join(checkpoint_folder, epoch_checkpoint_filename)
+        checkpoint_filename_swa = 'fold_' + str(fold) + "_checkpoint_swa.pth"
+        checkpoint_filepath_swa = os.path.join(checkpoint_folder, checkpoint_filename_swa)
         
         log.write('Validation metric {:.6f}.  Saving model ...'.format(val_metric_epoch))
 
         valid_metric_optimal = val_metric_epoch
-        torch.save(model.state_dict(), epoch_checkpoint_filepath)
+        
+        # swa update weights
+        state_dict_last_epoch = torch.load(checkpoint_filepath_last_epoch)
+        state_dict = model.state_dict()
+        
+        for name, param in state_dict.items():
+            
+            state_dict[name].data.copy_((param.data + epoch*state_dict_last_epoch[name].data) / (epoch + 1))
+            
+        model.load_state_dict(state_dict) 
+        
+        torch.save(model.state_dict(), checkpoint_filepath_swa)
 
 
 if __name__ == "__main__":
