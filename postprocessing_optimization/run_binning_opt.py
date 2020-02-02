@@ -3,10 +3,12 @@ from functools import partial
 from scipy.stats import spearmanr
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 import sys
 from metric import *
 from file import *
 from include import *
+import pickle
 
 def seed_everything(seed=42):
     random.seed(seed)
@@ -155,6 +157,12 @@ def get_best_threshold(column, oof_df, train_df, test_size=10000):
     
     oof_df_copy = oof_df.copy()
     spearman_no_threshold = Spearman(train_df[TARGET_COLUMNS].values, oof_df_copy[TARGET_COLUMNS].values)
+    
+    # apply minmax scaler
+    scaler = MinMaxScaler()
+    oof_df_column_values = oof_df_copy[column].values.reshape(-1, 1)
+    oof_df_copy[column] = scaler.fit_transform(oof_df_column_values).squeeze()
+    
     oof_df_copy = apply_threshold(oof_df_copy, column, original_thresholds)
     spearman_original = Spearman(train_df[TARGET_COLUMNS].values, oof_df_copy[TARGET_COLUMNS].values)
     
@@ -213,6 +221,7 @@ if __name__ == "__main__":
     best_spearman_list = []
     
     for column in TARGET_COLUMNS:
+        
         _, best_spearman, best_thresholds, best_oof_df = get_best_threshold(column, oof_df, train_df, test_size=6000)
         best_threshold_list.append(best_thresholds)
         best_spearman_list.append(best_spearman)
@@ -224,3 +233,8 @@ if __name__ == "__main__":
                 
         with open('best_spearman.txt', 'a+') as filehandle:
             filehandle.write('%s\n' % best_spearman)
+            
+    with open("best_threshold_pickle.txt", "wb") as fp:   #Pickling
+        pickle.dump(best_threshold_list, fp)
+    with open("best_spearman_pickle.txt", "wb") as fp:   #Pickling
+        pickle.dump(best_spearman_list, fp)

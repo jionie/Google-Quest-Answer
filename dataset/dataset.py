@@ -293,8 +293,16 @@ class QuestDataset(torch.utils.data.Dataset):
 
             else:
     
-                t = t[:t_new_len]
-                c = c[:c_new_len]
+                # truncate
+                if len(t) - t_new_len > 0:
+                    t = t[:t_new_len//4] + t[len(t)-t_new_len+t_new_len//4:]
+                else:
+                    t = t[:t_new_len]
+
+                if len(c) - c_new_len > 0:
+                    c = c[:c_new_len//4] + c[len(c)-c_new_len+c_new_len//4:]
+                else:
+                    c = c[:c_new_len]
 
         # some bad cases
         if (len(t) + len(c) + num_token > max_sequence_length):
@@ -387,9 +395,20 @@ class QuestDataset(torch.utils.data.Dataset):
                         
             else:
     
-                t = t[:t_new_len]
-                q = q[:q_new_len]
-                a = a[:a_new_len]
+                if len(t) - t_new_len > 0:
+                    t = t[:t_new_len//4] + t[len(t)-t_new_len+t_new_len//4:]
+                else:
+                    t = t[:t_new_len]
+
+                if len(q) - q_new_len > 0:
+                    q = q[:q_new_len//4] + q[len(q)-q_new_len+q_new_len//4:]
+                else:
+                    q = q[:q_new_len]
+
+                if len(a) - a_new_len > 0:
+                    a = a[:a_new_len//4] + a[len(a)-a_new_len+a_new_len//4:]
+                else:
+                    a = a[:a_new_len]
 
         # some bad cases
         if (len(a) + len(t) + len(q) + num_token > max_sequence_length):
@@ -492,9 +511,6 @@ class QuestDataset(torch.utils.data.Dataset):
                 raise NotImplementedError
             
         else:
-            t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer, \
-                max_sequence_length=self.max_len, \
-                t_max_len=t_max_len, q_max_len=q_max_len, a_max_len=a_max_len, num_token=num_token)
             
             if self.content == "Question_Answer":
                 t_tokens, q_tokens, a_tokens = self.trim_input(row.question_title, row.question_body, row.answer, \

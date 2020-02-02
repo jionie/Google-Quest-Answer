@@ -150,9 +150,15 @@ if __name__ == "__main__":
     oof_bert_base_uncased = pd.read_csv(model_folder + "bert/bert-base-uncased-bce-BertAdam-WarmupLinearSchedule-10-2020-aug_differential_relu_v2/oof_bert_base_uncased.csv")
     oof_bert_base_cased = pd.read_csv(model_folder + "bert/bert-base-cased-bce-BertAdam-WarmupLinearSchedule-10-1996-aug_differential_relu_v2/oof-bert-base-cased-v2.csv")
 
-    oof_df = (oof_xlnet_base_cased[TARGET_COLUMNS] + oof_bert_base_uncased[TARGET_COLUMNS] + oof_bert_base_cased[TARGET_COLUMNS])/3.0
+    # oof_df = (oof_xlnet_base_cased[TARGET_COLUMNS] + oof_bert_base_uncased[TARGET_COLUMNS] \
+    #     + oof_bert_base_cased[TARGET_COLUMNS] + oof_question_answer[TARGET_COLUMNS])/4.0
+    oof_df = (oof_xlnet_base_cased[TARGET_COLUMNS] + oof_bert_base_uncased[TARGET_COLUMNS] \
+        + oof_bert_base_cased[TARGET_COLUMNS])/3.0
 
     train_df = pd.read_csv("/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train.csv")
+    
+    spearman = Spearman(train_df[TARGET_COLUMNS].values, oof_df[TARGET_COLUMNS].values)
+    print(spearman)
     
     best_threshold_list = []
     

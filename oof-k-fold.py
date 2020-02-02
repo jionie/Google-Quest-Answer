@@ -302,6 +302,7 @@ def postprocessing(oof_df, target_columns):
        'question_has_commonly_accepted_answer', \
     #    'question_multi_intent', \
        'question_not_really_a_question', \
+       'question_opinion_seeking', \
        'question_type_choice', \
        'question_type_compare', \
        'question_type_consequence', \
@@ -348,7 +349,6 @@ def postprocessing(oof_df, target_columns):
     #    'question_asker_intent_understanding', \
     #    'question_body_critical', \
     #    'question_interestingness_others', \
-    #    'question_has_commonly_accepted_answer', \
        'question_interestingness_self', \
     #    'question_well_written', \
     #    'answer_helpful', \
