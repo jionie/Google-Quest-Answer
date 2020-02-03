@@ -67,6 +67,7 @@ parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_d
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
 parser.add_argument('--n_splits', type=int, default=5, required=True, help="specify the n_splits for training")
 parser.add_argument('--augment', action='store_true', help="specify whether augmentation for training")
+parser.add_argument('--swa', action='store_true', help="specify whether to use swa model")
 parser.add_argument('--merge', action='store_true', help="specify whether to merge oof of question and answer")
 parser.add_argument('--extra_token', action='store_true', default=False, help='whether to use extra token for extra tasks')
 
@@ -133,12 +134,15 @@ def get_oof(
             hidden_layers, 
             valid_batch_size,
             checkpoint_folder,
-            seed
+            seed, 
+            swa
             ):
     
     torch.cuda.empty_cache()
-
-    checkpoint_filename = 'fold_' + str(fold) + "_checkpoint.pth"
+    if swa:
+        checkpoint_filename = 'fold_' + str(fold) + "_checkpoint_swa.pth"
+    else:
+        checkpoint_filename = 'fold_' + str(fold) + "_checkpoint.pth"
     checkpoint_filepath = os.path.join(checkpoint_folder, checkpoint_filename)
 
 
@@ -271,8 +275,10 @@ def generate_oof_files(train_data_folder, \
 
 def get_spearman(train_df, oof_df, checkpoint_folder, target_columns):
     
-    oof_df = postprocessing(oof_df, target_columns)
+    # oof_df = postprocessing(oof_df, target_columns)
+    # oof_df = postprocessing_v2(oof_df)
 
+    
     spearman = Spearman(train_df[target_columns].values, oof_df[target_columns].values)
     
     log = Logger()
@@ -282,6 +288,125 @@ def get_spearman(train_df, oof_df, checkpoint_folder, target_columns):
     log.write('\n')
     
     return
+
+def postprocessing_v2(oof_df):
+       
+    scaler = MinMaxScaler()
+    
+    # type 1 column [0, 0.333333, 0.5, 0.666667, 1]
+    # type 2 column [0, 0.333333, 0.666667]
+    # type 3 column [0.333333, 0.444444, 0.5, 0.555556, 0.666667, 0.777778, 0.8333333, 0.888889, 1]
+    # type 4 column [0.200000, 0.266667, 0.300000, 0.333333, 0.400000, \
+    # 0.466667, 0.5, 0.533333, 0.600000, 0.666667, 0.700000, \
+    # 0.733333, 0.800000, 0.866667, 0.900000, 0.933333, 1]
+    
+    # comment some columns based on oof result
+    
+    ################################################# handle type 1 columns
+    type_one_column_list = [
+       'question_conversational', \
+       'question_has_commonly_accepted_answer', \
+       'question_not_really_a_question', \
+       'question_type_choice', \
+       'question_type_compare', \
+       'question_type_consequence', \
+       'question_type_definition', \
+       'question_type_entity', \
+       'question_type_instructions', 
+    ]
+    
+    oof_df[type_one_column_list] = scaler.fit_transform(oof_df[type_one_column_list])
+    
+    tmp = oof_df.copy(deep=True)
+    
+    for column in type_one_column_list:
+        
+        oof_df.loc[tmp[column] <= 0.16667, column] = 0
+        oof_df.loc[(tmp[column] > 0.16667) & (tmp[column] <= 0.41667), column] = 0.333333
+        oof_df.loc[(tmp[column] > 0.41667) & (tmp[column] <= 0.58333), column] = 0.500000
+        oof_df.loc[(tmp[column] > 0.58333) & (tmp[column] <= 0.73333), column] = 0.666667
+        oof_df.loc[(tmp[column] > 0.73333), column] = 1
+    
+    
+    
+    ################################################# handle type 2 columns      
+#     type_two_column_list = [
+#         'question_type_spelling'
+#     ]
+    
+#     for column in type_two_column_list:
+#         if sum(tmp[column] > 0.15)>0:
+#             oof_df.loc[tmp[column] <= 0.15, column] = 0
+#             oof_df.loc[(tmp[column] > 0.15) & (tmp[column] <= 0.45), column] = 0.333333
+#             oof_df.loc[(tmp[column] > 0.45), column] = 0.666667
+#         else:
+#             t1 = max(int(len(tmp[column])*0.0013),2)
+#             t2 = max(int(len(tmp[column])*0.0008),1)
+#             thred1 = sorted(list(tmp[column]))[-t1]
+#             thred2 = sorted(list(tmp[column]))[-t2]
+#             oof_df.loc[tmp[column] <= thred1, column] = 0
+#             oof_df.loc[(tmp[column] > thred1) & (tmp[column] <= thred2), column] = 0.333333
+#             oof_df.loc[(tmp[column] > thred2), column] = 0.666667
+    
+    
+    
+    ################################################# handle type 3 columns      
+    type_three_column_list = [
+       'question_interestingness_self', 
+    ]
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    oof_df[type_three_column_list] = scaler.fit_transform(oof_df[type_three_column_list])
+    tmp[type_three_column_list] = scaler.fit_transform(tmp[type_three_column_list])
+    
+    for column in type_three_column_list:
+        oof_df.loc[tmp[column] <= 0.385, column] = 0.333333
+        oof_df.loc[(tmp[column] > 0.385) & (tmp[column] <= 0.47), column] = 0.444444
+        oof_df.loc[(tmp[column] > 0.47) & (tmp[column] <= 0.525), column] = 0.5
+        oof_df.loc[(tmp[column] > 0.525) & (tmp[column] <= 0.605), column] = 0.555556
+        oof_df.loc[(tmp[column] > 0.605) & (tmp[column] <= 0.715), column] = 0.666667
+        oof_df.loc[(tmp[column] > 0.715) & (tmp[column] <= 0.8), column] = 0.833333
+        oof_df.loc[(tmp[column] > 0.8) & (tmp[column] <= 0.94), column] = 0.888889
+        oof_df.loc[(tmp[column] > 0.94), column] = 1
+        
+        
+        
+    ################################################# handle type 4 columns      
+    type_four_column_list = [
+        'answer_satisfaction'
+    ]
+    scaler = MinMaxScaler(feature_range=(0.2, 1))
+    oof_df[type_four_column_list] = scaler.fit_transform(oof_df[type_four_column_list])
+    tmp[type_four_column_list] = scaler.fit_transform(tmp[type_four_column_list])
+    
+    for column in type_four_column_list:
+        
+        oof_df.loc[tmp[column] <= 0.233, column] = 0.200000
+        oof_df.loc[(tmp[column] > 0.233) & (tmp[column] <= 0.283), column] = 0.266667
+        oof_df.loc[(tmp[column] > 0.283) & (tmp[column] <= 0.315), column] = 0.300000
+        oof_df.loc[(tmp[column] > 0.315) & (tmp[column] <= 0.365), column] = 0.333333
+        oof_df.loc[(tmp[column] > 0.365) & (tmp[column] <= 0.433), column] = 0.400000
+        oof_df.loc[(tmp[column] > 0.433) & (tmp[column] <= 0.483), column] = 0.466667
+        oof_df.loc[(tmp[column] > 0.483) & (tmp[column] <= 0.517), column] = 0.500000
+        oof_df.loc[(tmp[column] > 0.517) & (tmp[column] <= 0.567), column] = 0.533333
+        oof_df.loc[(tmp[column] > 0.567) & (tmp[column] <= 0.633), column] = 0.600000
+        oof_df.loc[(tmp[column] > 0.633) & (tmp[column] <= 0.683), column] = 0.666667
+        oof_df.loc[(tmp[column] > 0.683) & (tmp[column] <= 0.715), column] = 0.700000
+        oof_df.loc[(tmp[column] > 0.715) & (tmp[column] <= 0.767), column] = 0.733333
+        oof_df.loc[(tmp[column] > 0.767) & (tmp[column] <= 0.833), column] = 0.800000
+        oof_df.loc[(tmp[column] > 0.883) & (tmp[column] <= 0.915), column] = 0.900000
+        oof_df.loc[(tmp[column] > 0.915) & (tmp[column] <= 0.967), column] = 0.933333
+        oof_df.loc[(tmp[column] > 0.967), column] = 1
+    
+    
+    ################################################# round to i / 90 (i from 0 to 90)
+#     oof_values = oof_df[TARGET_COLUMNS].values
+#     DEGREE = len(oof_df)//45*9
+#     if degree:
+#         DEGREE = degree
+#     oof_values = np.around(oof_values * DEGREE) / DEGREE  ### 90 To be changed
+#     oof_df[TARGET_COLUMNS] = oof_values
+    
+    return oof_df
 
 def postprocessing(oof_df, target_columns):
     
@@ -447,6 +572,12 @@ if __name__ == "__main__":
     
     # get oof
     
+    data_path = args.train_data_folder + "train_augment_final_with_clean.csv"
+    get_train_val_split(data_path=data_path, \
+                        save_path=args.train_data_folder, \
+                        n_splits=args.n_splits, \
+                        seed=args.seed)
+    
     # for fold in range(args.n_splits):
         
     #     # get train_data_loader and val_data_loader
@@ -467,16 +598,17 @@ if __name__ == "__main__":
     #     else:
     #         raise NotImplementedError
 
-    
     #     get_oof(args.n_splits, \
     #             fold, \
+    #             args.content, \
     #             val_data_loader, \
     #             args.model_type, \
     #             args.model_name, \
     #             args.hidden_layers, \
     #             args.valid_batch_size, \
     #             checkpoint_folder, \
-    #             args.seed)
+    #             args.seed, \
+    #             args.swa)
     
     generate_oof_files(args.train_data_folder, \
                        args.n_splits, \
@@ -486,7 +618,15 @@ if __name__ == "__main__":
                        args.content)
     
     train_df = pd.read_csv(args.train_data_folder + "train.csv")
-    oof_df = pd.read_csv(checkpoint_folder + "/oof.csv")
+    
+    if args.content == "Question_Answer":
+        oof_df = pd.read_csv(checkpoint_folder + "oof_Question_Answer.csv")
+    elif args.content == "Question":
+        oof_df = pd.read_csv(checkpoint_folder + "oof_Question.csv")
+    elif args.content == "Answer":
+        oof_df = pd.read_csv(checkpoint_folder + "oof_Answer.csv")
+    else:
+        raise NotImplementedError
     
     get_spearman(train_df, oof_df, checkpoint_folder, target_columns)
     

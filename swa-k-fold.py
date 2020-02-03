@@ -52,7 +52,7 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
 parser.add_argument("--max_len", type=int, default=512, required=False, help="specify the max_len of tokens")
-parser.add_argument('--hidden_layers', type=list, default=[-1, -3, -5, -7, -9], \
+parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
