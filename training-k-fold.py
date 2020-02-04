@@ -73,6 +73,7 @@ parser.add_argument('--load_pretrain', action='store_true', default=False, help=
 parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
 parser.add_argument('--n_splits', type=int, default=5, required=True, help="specify the n_splits for training")
+parser.add_argument('--split', type=str, default="GroupKfold", required=True, help="specify the splitting dataset way")
 parser.add_argument('--loss', type=str, default="mse", required=True, help="specify the loss for training")
 parser.add_argument('--augment', action='store_true', help="specify whether augmentation for training")
 
@@ -938,7 +939,8 @@ if __name__ == "__main__":
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
-                        seed=args.seed)
+                        seed=args.seed, \
+                        split=args.split)
 
     # get train_data_loader and val_data_loader
     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(args.fold, args.seed)

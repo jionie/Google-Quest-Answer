@@ -9,6 +9,7 @@ from sklearn.utils import shuffle
 import random
 from math import floor, ceil
 from sklearn.model_selection import GroupKFold
+from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 import nlpaug.augmenter.word as naw
 import nlpaug.augmenter.sentence as nas
 import nlpaug.augmenter.char as nac
@@ -669,15 +670,23 @@ def get_test_loader(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/
 def get_train_val_split(data_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train_augment.csv", \
                         save_path="/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/", \
                         n_splits=5, \
-                        seed=42):
+                        seed=42, \
+                        split="GroupKfold"):
 
     os.makedirs(save_path + '/split', exist_ok=True)
     df = pd.read_csv(data_path, encoding='utf8')
-    # shuffle df by seed
-    df = shuffle(df, random_state=seed)
-    gkf = GroupKFold(n_splits=n_splits).split(X=df.question_body, groups=df.question_body)
-
-    for fold, (train_idx, valid_idx) in enumerate(gkf):
+    
+    if split == "GroupKfold":
+        # shuffle df by seed
+        df = shuffle(df, random_state=seed)
+        kf = GroupKFold(n_splits=n_splits).split(X=df.question_body, groups=df.question_body)
+    elif split == "MultiStratifiedKfold":
+        kf = MultilabelStratifiedKFold(n_splits=n_splits, random_state=seed, shuffle=True).split(df.question_body, \
+            df[TARGET_COLUMNS].values)
+    else:
+        raise NotImplementedError
+        
+    for fold, (train_idx, valid_idx) in enumerate(kf):
         
         df_train = df.iloc[train_idx]
         df_val = df.iloc[valid_idx]
