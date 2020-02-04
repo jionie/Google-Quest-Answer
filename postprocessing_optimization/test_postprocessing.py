@@ -72,6 +72,91 @@ type_four_column_list = [
         'answer_satisfaction'
     ]
 
+# question_not_really_a_question
+# question_type_definition
+# question_type_spelling
+
+def postprocess_special_columns(oof_df, special_columns):
+    
+    scaler = MinMaxScaler()
+    oof_df[special_columns] = scaler.fit_transform(oof_df[special_columns])
+    
+    for column in special_columns:
+        
+        if column == "question_not_really_a_question":
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="LIFE_ARTS"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df["category"]=="LIFE_ARTS"), column] = -0.333333
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="CULTURE"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="CULTURE"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333) & (oof_df["category"]=="CULTURE"), column] = -0.500000
+            oof_df.loc[(oof_df[column] > 0.58333) & (oof_df["category"]=="CULTURE"), column] = -0.666667
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="SCIENCE"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="SCIENCE"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df["category"]=="SCIENCE"), column] = -0.500000
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="STACKOVERFLOW"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="STACKOVERFLOW"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df["category"]=="STACKOVERFLOW"), column] = -0.500000
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="TECHNOLOGY"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="TECHNOLOGY"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333) & (oof_df["category"]=="TECHNOLOGY"), column] = -0.500000
+            oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.83333) & (oof_df["category"]=="TECHNOLOGY"), column] = -0.666667
+            oof_df.loc[(oof_df[column] > 0.83333) & (oof_df["category"]=="TECHNOLOGY"), column] = -1
+            
+            oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
+            
+        if column == "question_type_definition":
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="LIFE_ARTS"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5) & (oof_df["category"]=="LIFE_ARTS"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.5) & (oof_df[column] <= 0.83333) & (oof_df["category"]=="LIFE_ARTS"), column] = -0.666667
+            oof_df.loc[(oof_df[column] > 0.83333) & (oof_df["category"]=="LIFE_ARTS"), column] = -1
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="CULTURE"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="CULTURE"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333) & (oof_df["category"]=="CULTURE"), column] = -0.500000
+            oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.83333) & (oof_df["category"]=="CULTURE"), column] = -0.666667
+            oof_df.loc[(oof_df[column] > 0.83333) & (oof_df["category"]=="CULTURE"), column] = -1
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="SCIENCE"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="SCIENCE"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333) & (oof_df["category"]=="SCIENCE"), column] = -0.500000
+            oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.83333) & (oof_df["category"]=="SCIENCE"), column] = -0.666667
+            oof_df.loc[(oof_df[column] > 0.83333) & (oof_df["category"]=="SCIENCE"), column] = -1
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="STACKOVERFLOW"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="STACKOVERFLOW"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333) & (oof_df["category"]=="STACKOVERFLOW"), column] = -0.500000
+            oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.83333) & (oof_df["category"]=="STACKOVERFLOW"), column] = -0.666667
+            oof_df.loc[(oof_df[column] > 0.83333) & (oof_df["category"]=="STACKOVERFLOW"), column] = -1
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="TECHNOLOGY"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667) & (oof_df["category"]=="TECHNOLOGY"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333) & (oof_df["category"]=="TECHNOLOGY"), column] = -0.500000
+            oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.83333) & (oof_df["category"]=="TECHNOLOGY"), column] = -0.666667
+            oof_df.loc[(oof_df[column] > 0.83333) & (oof_df["category"]=="TECHNOLOGY"), column] = -1
+            
+            oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
+            
+        if column == "question_type_spelling":
+            
+            oof_df.loc[oof_df["category"]=="LIFE_ARTS", column] = -0
+            
+            oof_df.loc[(oof_df[column] <= 0.16667) & (oof_df["category"]=="CULTURE"), column] = -0
+            oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5) & (oof_df["category"]=="CULTURE"), column] = -0.333333
+            oof_df.loc[(oof_df[column] > 0.5) & (oof_df["category"]=="CULTURE"), column] = -0.666667
+            
+            oof_df.loc[oof_df["category"]=="SCIENCE", column] = -0
+            oof_df.loc[oof_df["category"]=="STACKOVERFLOW", column] = -0
+            oof_df.loc[oof_df["category"]=="TECHNOLOGY", column] = -0
+            
+            oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
+       
+    return oof_df
+            
 
 def postprocessing(oof_df, target_columns):
     
@@ -84,6 +169,11 @@ def postprocessing(oof_df, target_columns):
     # 0.466667, 0.5, 0.533333, 0.600000, 0.666667, 0.700000, \
     # 0.733333, 0.800000, 0.866667, 0.900000, 0.933333, 1]
     
+    special_columns = ["question_not_really_a_question", \
+                       "question_type_definition", \
+                       "question_type_spelling"
+                        ]
+    oof_df = postprocess_special_columns(oof_df, special_columns)
     
     ################################################# handle type 1 columns
     type_one_column_list = [
@@ -91,13 +181,13 @@ def postprocessing(oof_df, target_columns):
     #    'question_expect_short_answer', \
     #    'question_fact_seeking', \
        'question_has_commonly_accepted_answer', \
+    #    'question_not_really_a_question', \
     #    'question_multi_intent', \
-       'question_not_really_a_question', \
        'question_opinion_seeking', \
        'question_type_choice', \
        'question_type_compare', \
        'question_type_consequence', \
-       'question_type_definition', \
+    #    'question_type_definition', \
        'question_type_entity', \
        'question_type_instructions', \
     #    'question_type_procedure', \
@@ -114,24 +204,24 @@ def postprocessing(oof_df, target_columns):
         oof_df.loc[oof_df[column] <= 0.16667, column] = -0
         oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667), column] = -0.333333
         oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333), column] = -0.500000
-        oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.73333), column] = -0.666667
-        oof_df.loc[(oof_df[column] > 0.73333), column] = -1
+        oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.83333), column] = -0.666667
+        oof_df.loc[(oof_df[column] > 0.83333), column] = -1
         
         oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
     
     ################################################# handle type 2 columns      
-    type_two_column_list = [
-        'question_type_spelling'
-    ]
+    # type_two_column_list = [
+    #     'question_type_spelling'
+    # ]
     
-    oof_df[type_two_column_list] = scaler.fit_transform(oof_df[type_two_column_list])
+    # oof_df[type_two_column_list] = scaler.fit_transform(oof_df[type_two_column_list])
     
-    for column in type_two_column_list:
-        oof_df.loc[oof_df[column] <= 0.16667, column] = -0
-        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5), column] = -0.333333
-        oof_df.loc[(oof_df[column] > 0.5), column] = -0.666667
+    # for column in type_two_column_list:
+    #     oof_df.loc[oof_df[column] <= 0.16667, column] = -0
+    #     oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5), column] = -0.333333
+    #     oof_df.loc[(oof_df[column] > 0.5), column] = -0.666667
         
-        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
+    #     oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
     
     
     
@@ -169,7 +259,7 @@ def postprocessing(oof_df, target_columns):
     type_four_column_list = [
         'answer_satisfaction'
     ]
-    
+    scaler = MinMaxScaler(feature_range=(0.2, 1))
     oof_df[type_four_column_list] = scaler.fit_transform(oof_df[type_four_column_list])
     
     for column in type_four_column_list:
@@ -186,7 +276,7 @@ def postprocessing(oof_df, target_columns):
         oof_df.loc[(oof_df[column] > 0.633333) & (oof_df[column] <= 0.683333), column] = -0.666667
         oof_df.loc[(oof_df[column] > 0.683333) & (oof_df[column] <= 0.716666), column] = -0.700000
         oof_df.loc[(oof_df[column] > 0.716666) & (oof_df[column] <= 0.766666), column] = -0.733333
-        oof_df.loc[(oof_df[column] > 0.767666) & (oof_df[column] <= 0.833333), column] = -0.800000
+        oof_df.loc[(oof_df[column] > 0.766666) & (oof_df[column] <= 0.833333), column] = -0.800000
         oof_df.loc[(oof_df[column] > 0.833333) & (oof_df[column] <= 0.883333), column] = -0.866667
         oof_df.loc[(oof_df[column] > 0.883333) & (oof_df[column] <= 0.916666), column] = -0.900000
         oof_df.loc[(oof_df[column] > 0.916666) & (oof_df[column] <= 0.966666), column] = -0.933333
@@ -196,9 +286,17 @@ def postprocessing(oof_df, target_columns):
     
     
     ################################################# round to i / 90 (i from 0 to 90)
-    oof_values = oof_df[target_columns].values
-    oof_values = np.around(oof_values * 90) / 90
-    oof_df[target_columns] = oof_values
+    oof_values = oof_df[TARGET_COLUMNS].values
+    DEGREE = len(oof_df)//45*9
+    # if degree:
+    #     DEGREE = degree
+    # DEGREE = 90
+    oof_values = np.around(oof_values * DEGREE) / DEGREE  ### 90 To be changed
+    oof_df[TARGET_COLUMNS] = oof_values
+    
+    # oof_values = oof_df[target_columns].values
+    # oof_values = np.around(oof_values * 90) / 90
+    # oof_df[target_columns] = oof_values
     
     return oof_df
 
@@ -219,11 +317,11 @@ def postprocessing_v2(oof_df):
     type_one_column_list = [
        'question_conversational', \
        'question_has_commonly_accepted_answer', \
-       'question_not_really_a_question', \
+    #    'question_not_really_a_question', \
        'question_type_choice', \
        'question_type_compare', \
        'question_type_consequence', \
-       'question_type_definition', \
+    #    'question_type_definition', \
        'question_type_entity', \
        'question_type_instructions', 
     ]
@@ -237,8 +335,8 @@ def postprocessing_v2(oof_df):
         oof_df.loc[tmp[column] <= 0.16667, column] = 0
         oof_df.loc[(tmp[column] > 0.16667) & (tmp[column] <= 0.41667), column] = 0.333333
         oof_df.loc[(tmp[column] > 0.41667) & (tmp[column] <= 0.58333), column] = 0.500000
-        oof_df.loc[(tmp[column] > 0.58333) & (tmp[column] <= 0.73333), column] = 0.666667
-        oof_df.loc[(tmp[column] > 0.73333), column] = 1
+        oof_df.loc[(tmp[column] > 0.58333) & (tmp[column] <= 0.83333), column] = 0.666667
+        oof_df.loc[(tmp[column] > 0.83333), column] = 1
     
     
     
@@ -354,10 +452,62 @@ if __name__ == "__main__":
     #           (oof_xlnet_base_cased[TARGET_COLUMNS] + oof_xlnet_base_cased_two_model[TARGET_COLUMNS])/2)/2.0
 
     train_df = pd.read_csv("/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train.csv")
+    oof_df["category"] = train_df["category"]
+    oof_df = postprocessing(oof_df, TARGET_COLUMNS)
+    # oof_df = postprocessing_v2(oof_df)
     
-    # oof_df = postprocessing(oof_df, TARGET_COLUMNS)
-    oof_df = postprocessing_v2(oof_df)
+    spearman, spearman_list = Spearman(train_df[TARGET_COLUMNS].values, oof_df[TARGET_COLUMNS].values)
     
-    spearman = Spearman(train_df[TARGET_COLUMNS].values, oof_df[TARGET_COLUMNS].values)
+    for i in range(len(TARGET_COLUMNS)):
+        print(TARGET_COLUMNS[i], ":", spearman_list[i])
     
     print(spearman)
+    
+    
+    
+# question_asker_intent_understanding : 0.3913240782174862
+# question_body_critical : 0.6505225400884914
+# question_conversational : 0.49628898642029673
+# question_expect_short_answer : 0.32475526913414987
+# question_fact_seeking : 0.3817788468272073
+# question_has_commonly_accepted_answer : 0.47230037109903056
+# question_interestingness_others : 0.36998401526413244
+# question_interestingness_self : 0.5113239919964795
+# question_multi_intent : 0.6113465378804653
+# question_not_really_a_question : 0.1289263771516838
+# question_opinion_seeking : 0.47941525675967983
+# question_type_choice : 0.7692508885743983
+# question_type_compare : 0.5456676906025371
+# question_type_consequence : 0.25940544311123
+# question_type_definition : 0.6240250166600889
+# question_type_entity : 0.6106638880179526
+# question_type_instructions : 0.7994884073149504
+# question_type_procedure : 0.37509398018350876
+# question_type_reason_explanation : 0.694063016795095
+# question_type_spelling : 0.14111060200616177
+# question_well_written : 0.5172281812146284
+# answer_helpful : 0.27378370210154007
+# answer_level_of_information : 0.45729384382970895
+# answer_plausible : 0.1726369612651556
+# answer_relevance : 0.20321320547230098
+# answer_satisfaction : 0.3609264160475774
+# answer_type_instructions : 0.7714005736196025
+# answer_type_procedure : 0.3167391088875858
+# answer_type_reason_explanation : 0.69948470127083
+# answer_well_written : 0.20999747875341068
+
+
+# question_asker_intent_understanding : 0.3913240782174862
+# question_expect_short_answer : 0.32475526913414987
+# question_fact_seeking : 0.3817788468272073
+# question_interestingness_others : 0.36998401526413244
+# question_not_really_a_question : 0.1289263771516838
+# question_type_consequence : 0.25940544311123
+# question_type_procedure : 0.37509398018350876
+# question_type_spelling : 0.14111060200616177
+# answer_helpful : 0.27378370210154007
+# answer_plausible : 0.1726369612651556
+# answer_relevance : 0.20321320547230098
+# answer_satisfaction : 0.3609264160475774
+# answer_type_procedure : 0.3167391088875858
+# answer_well_written : 0.20999747875341068
