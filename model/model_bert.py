@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 ############################################ Define Net Class
 class QuestNet(nn.Module):
-    def __init__(self, model_type="xlnet-base-cased", n_classes=30, n_category_classes=5, \
+    def __init__(self, model_type="xlnet-base-cased", tokenizer=None, n_classes=30, n_category_classes=5, \
                 n_host_classes=64, hidden_layers=[-1, -3, -5, -7], extra_token=False):
         super(QuestNet, self).__init__()
         self.model_name = 'QuestModel'
@@ -49,7 +49,8 @@ class QuestNet(nn.Module):
             self.xlnet_model = XLNetModel.from_pretrained(model_type, dropout=0, output_hidden_states=True)   
             self.hidden_size = 1024
         elif model_type == "roberta-base":
-            self.roberta_model = RobertaModel.from_pretrained(model_type, hidden_dropout_prob=0, output_hidden_states=True)   
+            self.roberta_model = RobertaModel.from_pretrained(model_type, hidden_dropout_prob=0, output_hidden_states=True)
+            self.roberta_model.resize_token_embeddings(len(tokenizer)) 
             self.hidden_size = 768
         elif model_type == "albert-base-v2":
             self.albert_model = AlbertModel.from_pretrained(model_type, hidden_dropout_prob=0, output_hidden_states=True)
@@ -206,6 +207,23 @@ class QuestNet(nn.Module):
                 logits_category = self.get_logits_by_random_dropout(fuse_hidden_category, self.fc_1_category, self.fc_category)
                 logits_host = self.get_logits_by_random_dropout(fuse_hidden_host, self.fc_1_host, self.fc_host)
             
+        elif (self.model_type == "roberta-base"):
+
+            attention_mask = attention_mask.float()
+            outputs = self.roberta_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+            # outputs = self.roberta_model(input_ids=ids, attention_mask=attention_mask)
+            hidden_states = outputs[2]
+            
+            fuse_hidden = self.get_hidden_states_by_index(hidden_states, 0)
+            logits = self.get_logits_by_random_dropout(fuse_hidden, self.fc_1, self.fc)
+            
+            if self.extra_token:
+                fuse_hidden_category = self.get_hidden_states_by_index(hidden_states, 1)
+                fuse_hidden_host = self.get_hidden_states_by_index(hidden_states, 2)
+                
+                logits_category = self.get_logits_by_random_dropout(fuse_hidden_category, self.fc_1_category, self.fc_category)
+                logits_host = self.get_logits_by_random_dropout(fuse_hidden_host, self.fc_1_host, self.fc_host)
+        
         elif ((self.model_type == "albert-base-v2") \
             or (self.model_type == "albert-large-v2") \
             or (self.model_type == "albert-xlarge-v2") \

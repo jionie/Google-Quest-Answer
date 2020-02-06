@@ -109,6 +109,7 @@ ANSWER_UNBALANCE_WEIGIHT = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 ############################################################################## seed All
 def seed_everything(seed=42):
     random.seed(seed)
+    os.environ['CUDA_LAUNCH_BLOCKING'] = str(1)
     os.environ['PYHTONHASHseed'] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -120,6 +121,7 @@ def seed_everything(seed=42):
 
 ############################################################################## define function for training
 def training(
+            tokenizer, 
             content,
             n_splits,
             fold,
@@ -228,6 +230,7 @@ def training(
     if model_type == "bert":
         if extra_token:
             model = QuestNet(model_type=model_name, \
+                    tokenizer=tokenizer, \
                     n_classes=NUM_CLASS, \
                     n_category_classes=NUM_CATEGORY_CLASS, \
                     n_host_classes=NUM_HOST_CLASS, \
@@ -235,6 +238,7 @@ def training(
                     extra_token=True)
         else:
             model = QuestNet(model_type=model_name, \
+                    tokenizer=tokenizer, \
                     n_classes=NUM_CLASS, \
                     n_category_classes=NUM_CATEGORY_CLASS, \
                     n_host_classes=NUM_HOST_CLASS, \
@@ -243,6 +247,7 @@ def training(
     elif model_type == "xlnet":
         if extra_token:
             model = QuestNet(model_type=model_name, \
+                    tokenizer=tokenizer, \
                     n_classes=NUM_CLASS, \
                     n_category_classes=NUM_CATEGORY_CLASS, \
                     n_host_classes=NUM_HOST_CLASS, \
@@ -250,6 +255,7 @@ def training(
                     extra_token=True)
         else:
             model = QuestNet(model_type=model_name, \
+                    tokenizer=tokenizer, \
                     n_classes=NUM_CLASS, \
                     n_category_classes=NUM_CATEGORY_CLASS, \
                     n_host_classes=NUM_HOST_CLASS, \
@@ -430,19 +436,19 @@ def training(
             
         elif (model_name == "roberta-base"):
             
-            list_layers = [model.roberta_model.word_embedding,
-                      model.roberta_model.layer[0],
-                      model.roberta_model.layer[1],
-                      model.roberta_model.layer[2],
-                      model.roberta_model.layer[3],
-                      model.roberta_model.layer[4],
-                      model.roberta_model.layer[5],
-                      model.roberta_model.layer[6],
-                      model.roberta_model.layer[7],
-                      model.roberta_model.layer[8],
-                      model.roberta_model.layer[9],
-                      model.roberta_model.layer[10],
-                      model.roberta_model.layer[11],
+            list_layers = [model.roberta_model.embeddings,
+                      model.roberta_model.encoder.layer[0],
+                      model.roberta_model.encoder.layer[1],
+                      model.roberta_model.encoder.layer[2],
+                      model.roberta_model.encoder.layer[3],
+                      model.roberta_model.encoder.layer[4],
+                      model.roberta_model.encoder.layer[5],
+                      model.roberta_model.encoder.layer[6],
+                      model.roberta_model.encoder.layer[7],
+                      model.roberta_model.encoder.layer[8],
+                      model.roberta_model.encoder.layer[9],
+                      model.roberta_model.encoder.layer[10],
+                      model.roberta_model.encoder.layer[11],
                       model.fc_1,
                       model.fc
                       ]
@@ -805,6 +811,7 @@ def training(
                         (valid_loss[0], spearman))
         else:
             for tr_batch_i, (token_ids, seg_ids, labels) in enumerate(train_data_loader):
+    
                 rate = 0
                 for param_group in optimizer.param_groups:
                     rate += param_group['lr'] / len(optimizer.param_groups)
@@ -963,7 +970,7 @@ if __name__ == "__main__":
             category_encoder = LabelBinarizer()
             category_encoder.fit(list(set(train_category_list + test_category_list)))
 
-            train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+            train_data_loader, val_data_loader, tokenizer = get_train_val_loaders(train_data_path=train_data_path, \
                                                         val_data_path=val_data_path, \
                                                         host_encoder=host_encoder, \
                                                         category_encoder=category_encoder, \
@@ -978,7 +985,7 @@ if __name__ == "__main__":
             
         else:
         
-            train_data_loader, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+            train_data_loader, val_data_loader, tokenizer = get_train_val_loaders(train_data_path=train_data_path, \
                                                         val_data_path=val_data_path, \
                                                         model_type=args.model_name, \
                                                         content=args.content, \
@@ -993,6 +1000,7 @@ if __name__ == "__main__":
 
     # start training
     training(
+            tokenizer, \
             args.content, \
             args.n_splits, \
             args.fold, \

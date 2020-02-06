@@ -66,6 +66,7 @@ parser.add_argument("--checkpoint_folder", type=str, default="/media/jionie/my_d
     required=False, help="specify the folder for checkpoint")
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
 parser.add_argument('--n_splits', type=int, default=5, required=True, help="specify the n_splits for training")
+parser.add_argument('--split', type=str, default="GroupKfold", required=True, help="specify the splitting dataset way")
 parser.add_argument('--augment', action='store_true', help="specify whether augmentation for training")
 parser.add_argument('--swa', action='store_true', help="specify whether to use swa model")
 parser.add_argument('--merge', action='store_true', help="specify whether to merge oof of question and answer")
@@ -125,6 +126,7 @@ def seed_everything(seed=42):
 
 ############################################################################## define function for training
 def get_oof(
+            tokenizer,
             n_splits,
             fold,
             content,
@@ -182,9 +184,9 @@ def get_oof(
         raise NotImplementedError
     
     if model_type == "bert":
-        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
+        model = QuestNet(model_type=model_name, tokenizer=tokenizer,n_classes=NUM_CLASS, hidden_layers=hidden_layers)
     elif model_type == "xlnet":
-        model = QuestNet(model_type=model_name, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
+        model = QuestNet(model_type=model_name, tokenizer=tokenizer, n_classes=NUM_CLASS, hidden_layers=hidden_layers)
     else:
         raise NotImplementedError
     
@@ -576,7 +578,8 @@ if __name__ == "__main__":
     get_train_val_split(data_path=data_path, \
                         save_path=args.train_data_folder, \
                         n_splits=args.n_splits, \
-                        seed=args.seed)
+                        seed=args.seed, \
+                        split=args.split)
     
     # for fold in range(args.n_splits):
         
@@ -585,7 +588,7 @@ if __name__ == "__main__":
     #     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
 
     #     if ((args.model_type == "bert") or (args.model_type == "xlnet")):
-    #         _, val_data_loader = get_train_val_loaders(train_data_path=train_data_path, \
+    #         _, val_data_loader, tokenizer = get_train_val_loaders(train_data_path=train_data_path, \
     #                                                     val_data_path=val_data_path, \
     #                                                     model_type=args.model_name, \
     #                                                     content=args.content, \
@@ -598,7 +601,8 @@ if __name__ == "__main__":
     #     else:
     #         raise NotImplementedError
 
-    #     get_oof(args.n_splits, \
+    #     get_oof(tokenizer, \
+    #             args.n_splits, \
     #             fold, \
     #             args.content, \
     #             val_data_loader, \

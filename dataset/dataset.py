@@ -104,45 +104,44 @@ class QuestDataset(torch.utils.data.Dataset):
         if ((self.model_type == "bert-base-uncased") or (self.model_type == "bert-large-uncased")):
             
             self.tokenizer = BertTokenizer.from_pretrained(model_type,\
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
             
         elif((self.model_type == "bert-base-cased") or (self.model_type == "bert-large-cased")):
             
             self.tokenizer = BertTokenizer.from_pretrained(model_type,\
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
             
         elif((self.model_type == "flaubert-base-uncased")):
             
             self.tokenizer = FlaubertTokenizer.from_pretrained(model_type,\
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
             
         elif((self.model_type == "flaubert-base-cased") or (self.model_type == "flaubert-large-cased")):
             
             self.tokenizer = FlaubertTokenizer.from_pretrained(model_type,\
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
             
         elif ((self.model_type == "xlnet-base-cased") \
             or (self.model_type == "xlnet-large-cased")):
             
             self.tokenizer = XLNetTokenizer.from_pretrained(model_type, \
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
             
         elif((self.model_type == "roberta-base")):
             
-            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base", \
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+            self.tokenizer = RobertaTokenizer.from_pretrained(self.model_type)
             
         elif((self.model_type == "albert-base-v2") or (self.model_type == "albert-large-v2") \
             or (self.model_type == "albert-xlarge-v2") \
             or (self.model_type == "albert-xxlarge-v2")):
             
             self.tokenizer = AlbertTokenizer.from_pretrained(model_type, \
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
             
         elif((self.model_type == "gpt2")):
             
             self.tokenizer = AutoTokenizer.from_pretrained("gpt2", \
-                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[SEP]", "[SEP]", "[SEP]"])
+                additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
             
         else:
             
@@ -581,6 +580,21 @@ class QuestDataset(torch.utils.data.Dataset):
             else:
                 raise NotImplementedError
             
+        elif (self.model_type == "roberta-base"):
+            
+            if self.content == "Question_Answer":
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            elif ((self.content == "Question") or (self.content == "Answer")):
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+            else:
+                raise NotImplementedError
+            
         elif ((self.model_type == "albert-base-v2") \
             or (self.model_type == "albert-large-v2") \
             or (self.model_type == "albert-xlarge-v2") \
@@ -616,7 +630,8 @@ class QuestDataset(torch.utils.data.Dataset):
         first_sep = True
         for i, e in enumerate(ids):
             seg_ids[i] = seg_idx
-            if e == SEP_TOKEN_ID:
+            # if e == SEP_TOKEN_ID:
+            if e == self.tokenizer.sep_token_id:
                 if first_sep:
                     first_sep = False
                 else:
@@ -728,7 +743,7 @@ def get_train_val_loaders(train_data_path="/media/jionie/my_disk/Kaggle/Google_Q
     val_loader.num = len(df_val)
     val_loader.df = df_val
 
-    return train_loader, val_loader
+    return train_loader, val_loader, ds_train.tokenizer
 
 ############################################ Define test function
 
