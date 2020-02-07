@@ -584,14 +584,14 @@ class QuestDataset(torch.utils.data.Dataset):
             
             if self.content == "Question_Answer":
                 if self.extra_token:
-                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                    tokens = ['<s>'] + ['<s>'] + ['<s>'] + t_tokens + ['</s>'] + q_tokens + ['</s>'] + a_tokens + ['</s>']
                 else:
-                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                    tokens = ['<s>'] + t_tokens + ['</s>'] + q_tokens + ['</s>'] + a_tokens + ['</s>']
             elif ((self.content == "Question") or (self.content == "Answer")):
                 if self.extra_token:
-                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                    tokens = ['<s>'] + ['<s>'] + ['<s>'] + t_tokens + ['</s>'] + c_tokens + ['</s>']
                 else:
-                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                    tokens = ['<s>'] + t_tokens + ['</s>'] + c_tokens + ['</s>']
             else:
                 raise NotImplementedError
             

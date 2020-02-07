@@ -15,31 +15,31 @@ class QuestNet(nn.Module):
         self.extra_token = extra_token
         
         if model_type == "bert-base-uncased":
-            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0, \
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "bert-large-uncased":
-            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0., \
                                                     output_hidden_states=True)   
             self.hidden_size = 1024
         elif model_type == "bert-large-cased":
-            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0, \
                                                     output_hidden_states=True)   
             self.hidden_size = 1024
         elif model_type == "bert-base-cased":
-            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0.1, \
+            self.bert_model = BertModel.from_pretrained(model_type, hidden_dropout_prob=0, \
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "flaubert-base-cased":
-            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0, \
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "flaubert-large-cased":
-            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0, \
                                                     output_hidden_states=True)   
             self.hidden_size = 1024
         elif model_type == "flaubert-base-uncased":
-            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0.1, \
+            self.flaubert_model = FlaubertModel.from_pretrained(model_type, dropout=0, \
                                                     output_hidden_states=True)   
             self.hidden_size = 768
         elif model_type == "xlnet-base-cased":
@@ -65,7 +65,7 @@ class QuestNet(nn.Module):
             self.albert_model = AlbertModel.from_pretrained(model_type, hidden_dropout_prob=0, output_hidden_states=True)
             self.hidden_size = 1024 * 4
         elif model_type == "gpt2":
-            self.gpt2_model = GPT2Model.from_pretrained(model_type, initializer_range=0.02, output_hidden_states=True)
+            self.gpt2_model = GPT2Model.from_pretrained(model_type, initializer_range=0, output_hidden_states=True)
             self.hidden_size = 768
             # OpenAIGPTModel
         else:
@@ -210,7 +210,7 @@ class QuestNet(nn.Module):
         elif (self.model_type == "roberta-base"):
 
             attention_mask = attention_mask.float()
-            outputs = self.roberta_model(input_ids=ids, token_type_ids=seg_ids, attention_mask=attention_mask)
+            outputs = self.roberta_model(input_ids=ids, attention_mask=attention_mask)
             # outputs = self.roberta_model(input_ids=ids, attention_mask=attention_mask)
             hidden_states = outputs[2]
             
