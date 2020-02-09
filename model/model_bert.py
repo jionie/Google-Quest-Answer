@@ -52,6 +52,9 @@ class QuestNet(nn.Module):
             self.roberta_model = RobertaModel.from_pretrained(model_type, hidden_dropout_prob=0, output_hidden_states=True)
             self.roberta_model.resize_token_embeddings(len(tokenizer)) 
             self.hidden_size = 768
+        elif model_type == "t5-base":
+            self.t5_model = T5Model.from_pretrained(model_type, dropout_rate=0.1, output_hidden_states=True)
+            self.hidden_size = 768
         elif model_type == "albert-base-v2":
             self.albert_model = AlbertModel.from_pretrained(model_type, hidden_dropout_prob=0, output_hidden_states=True)
             self.hidden_size = 768
@@ -215,6 +218,22 @@ class QuestNet(nn.Module):
             hidden_states = outputs[2]
             
             fuse_hidden = self.get_hidden_states_by_index(hidden_states, 0)
+            logits = self.get_logits_by_random_dropout(fuse_hidden, self.fc_1, self.fc)
+            
+            if self.extra_token:
+                fuse_hidden_category = self.get_hidden_states_by_index(hidden_states, 1)
+                fuse_hidden_host = self.get_hidden_states_by_index(hidden_states, 2)
+                
+                logits_category = self.get_logits_by_random_dropout(fuse_hidden_category, self.fc_1_category, self.fc_category)
+                logits_host = self.get_logits_by_random_dropout(fuse_hidden_host, self.fc_1_host, self.fc_host)
+                
+        elif (self.model_type == "t5-base"):
+    
+            attention_mask = attention_mask.float()
+            outputs = self.t5_model(input_ids=ids, attention_mask=attention_mask)
+            hidden_states = outputs[1]
+            
+            fuse_hidden = self.get_hidden_states_by_index(hidden_states, -1)
             logits = self.get_logits_by_random_dropout(fuse_hidden, self.fc_1, self.fc)
             
             if self.extra_token:

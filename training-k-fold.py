@@ -20,7 +20,7 @@ from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR, _LRScheduler
 from tensorboardX import SummaryWriter
 from pytorch_pretrained_bert.optimization import BertAdam
-from transformers import get_linear_schedule_with_warmup
+from transformers import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 
 # import apex for mix precision training
 from apex import amp
@@ -52,7 +52,7 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
 parser.add_argument("--max_len", type=int, default=512, required=False, help="specify the max_len of tokens")
-parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
+parser.add_argument('--hidden_layers', type=list, default=[-1], \
     required=False, help='specify the hidden_layers for Loss')
 parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
@@ -82,7 +82,7 @@ parser.add_argument('--augment', action='store_true', help="specify whether augm
 NUM_CATEGORY_CLASS=5
 NUM_HOST_CLASS=64
 AUXILIARY_WEIGHTs = [1, 0.05, 0.05]
-DECAY_FACTOR = 0.95
+DECAY_FACTOR = 0.9
 MIN_LR = 2e-6
 # UNBALANCE_WEIGIHT = [2, 1, 2, 2, 2, 2, \
 #                   1, 2, 2, 4, 1, 2, \
@@ -453,6 +453,25 @@ def training(
                       model.fc
                       ]
             
+        elif (model_name == "t5-base"):
+            
+            list_layers = [model.t5_model.shared,
+                      model.t5_model.encoder.block[0],
+                      model.t5_model.encoder.block[1],
+                      model.t5_model.encoder.block[2],
+                      model.t5_model.encoder.block[3],
+                      model.t5_model.encoder.block[4],
+                      model.t5_model.encoder.block[5],
+                      model.t5_model.encoder.block[6],
+                      model.t5_model.encoder.block[7],
+                      model.t5_model.encoder.block[8],
+                      model.t5_model.encoder.block[9],
+                      model.t5_model.encoder.block[10],
+                      model.t5_model.encoder.block[11],
+                      model.fc_1,
+                      model.fc
+                      ]
+            
         elif ((model_name == "albert-base-v2") or \
             (model_name == "albert-large-v2") or \
             (model_name == "albert-xlarge-v2") or \
@@ -487,17 +506,21 @@ def training(
 
         else:
             raise NotImplementedError
-
-#         for i in range(len(list_layers)):
-#             list_lr.append(lr)
-#             lr = lr * DECAY_FACTOR
-#             list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
-
-#         list_lr.reverse()
         
-        mult = lr / MIN_LR
-        step = mult**(1/(len(list_layers)-1))
-        list_lr = [MIN_LR * (step ** i) for i in range(len(list_layers))]
+        if (model_name == ""):
+
+            for i in range(len(list_layers)):
+                list_lr.append(lr)
+                lr = lr * DECAY_FACTOR
+                # list_lr.append(lr - i * (lr - MIN_LR) / (len(list_layers) - 1))
+
+            list_lr.reverse()
+            
+        else:
+        
+            mult = lr / MIN_LR
+            step = mult**(1/(len(list_layers)-1))
+            list_lr = [MIN_LR * (step ** i) for i in range(len(list_layers))]
         
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             
@@ -604,6 +627,9 @@ def training(
     
     ############################################################################### lr_scheduler
     if lr_scheduler_name == "CosineAnealing":
+        scheduler = get_cosine_schedule_with_warmup(optimizer, \
+            num_warmup_steps=warmup_proportion, \
+            num_training_steps=num_train_optimization_steps)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 12, eta_min=1e-5, last_epoch=-1)
         lr_scheduler_each_iter = False
     elif lr_scheduler_name == "WarmRestart":

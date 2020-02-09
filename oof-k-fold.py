@@ -410,25 +410,14 @@ def postprocessing_v2(oof_df):
     
     return oof_df
 
-def postprocessing(oof_df, target_columns):
-    
+def postprocessing(oof_df):
+       
     scaler = MinMaxScaler()
-    
-    # type 1 column [0, 0.333333, 0.5, 0.666667, 1]
-    # type 2 column [0, 0.333333, 0.666667]
-    # type 3 column [0.333333, 0.444444, 0.5, 0.555556, 0.666667, 0.777778, 0.8333333, 0.888889, 1]
-    # type 4 column [0.200000, 0.266667, 0.300000, 0.333333, 0.400000, \
-    # 0.466667, 0.5, 0.533333, 0.600000, 0.666667, 0.700000, \
-    # 0.733333, 0.800000, 0.866667, 0.900000, 0.933333, 1]
-    
     
     ################################################# handle type 1 columns
     type_one_column_list = [
        'question_conversational', \
-    #    'question_expect_short_answer', \
-    #    'question_fact_seeking', \
        'question_has_commonly_accepted_answer', \
-    #    'question_multi_intent', \
        'question_not_really_a_question', \
        'question_opinion_seeking', \
        'question_type_choice', \
@@ -436,106 +425,91 @@ def postprocessing(oof_df, target_columns):
        'question_type_consequence', \
        'question_type_definition', \
        'question_type_entity', \
-       'question_type_instructions', \
-    #    'question_type_procedure', \
-    #    'question_type_reason_explanation', \
-    #    'answer_type_instructions'
-    #    'answer_type_procedure', \
-    #    'answer_type_reason_explanation', \
+       'question_type_instructions'
     ]
+    
     
     oof_df[type_one_column_list] = scaler.fit_transform(oof_df[type_one_column_list])
     
+    tmp = oof_df.copy(deep=True)
+    
     for column in type_one_column_list:
         
-        oof_df.loc[oof_df[column] <= 0.16667, column] = -0
-        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.41667), column] = -0.333333
-        oof_df.loc[(oof_df[column] > 0.41667) & (oof_df[column] <= 0.58333), column] = -0.500000
-        oof_df.loc[(oof_df[column] > 0.58333) & (oof_df[column] <= 0.73333), column] = -0.666667
-        oof_df.loc[(oof_df[column] > 0.73333), column] = -1
-        
-        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
+        oof_df.loc[tmp[column] <= ((0.333333 + 0)/2), column] = 0
+        oof_df.loc[(tmp[column] > ((0.333333 + 0)/2)) & (tmp[column] <= ((0.500000 + 0.333333)/2)), column] = 0.333333
+        oof_df.loc[(tmp[column] > ((0.500000 + 0.333333)/2)) & (tmp[column] <= ((0.666667 + 0.500000)/2)), column] = 0.500000
+        oof_df.loc[(tmp[column] > ((0.666667 + 0.500000)/2)) & (tmp[column] <= ((1 + 0.666667)/2)), column] = 0.666667
+        oof_df.loc[(tmp[column] > ((1 + 0.666667)/2)), column] = 1
+    
+    
     
     ################################################# handle type 2 columns      
     type_two_column_list = [
         'question_type_spelling'
     ]
     
-    oof_df[type_two_column_list] = scaler.fit_transform(oof_df[type_two_column_list])
-    
     for column in type_two_column_list:
-        oof_df.loc[oof_df[column] <= 0.16667, column] = -0
-        oof_df.loc[(oof_df[column] > 0.16667) & (oof_df[column] <= 0.5), column] = -0.333333
-        oof_df.loc[(oof_df[column] > 0.5), column] = -0.666667
-        
-        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
-    
+   
+        oof_df.loc[tmp[column] <= ((0.333333 + 0)/2), column] = 0
+        oof_df.loc[(tmp[column] > ((0.333333 + 0)/2)) & (tmp[column] <= ((0.666667 + 0.333333)/2)), column] = 0.333333
+        oof_df.loc[(tmp[column] > ((0.666667 + 0.333333)/2)), column] = 0.666667
+
     
     
     ################################################# handle type 3 columns      
     type_three_column_list = [
-    #    'question_asker_intent_understanding', \
-    #    'question_body_critical', \
-    #    'question_interestingness_others', \
-       'question_interestingness_self', \
-    #    'question_well_written', \
-    #    'answer_helpful', \
-    #    'answer_level_of_information', \
-    #    'answer_plausible', \
-    #    'answer_relevance', \
-    #    'answer_well_written'
+       'question_interestingness_self', 
     ]
-
+    scaler = MinMaxScaler(feature_range=(0.333333, 1))
     oof_df[type_three_column_list] = scaler.fit_transform(oof_df[type_three_column_list])
+    tmp[type_three_column_list] = scaler.fit_transform(tmp[type_three_column_list])
     
     for column in type_three_column_list:
-        oof_df.loc[oof_df[column] <= 0.388889, column] = -0.333333
-        oof_df.loc[(oof_df[column] > 0.388889) & (oof_df[column] <= 0.472222), column] = -0.444444
-        oof_df.loc[(oof_df[column] > 0.472222) & (oof_df[column] <= 0.527778), column] = -0.5
-        oof_df.loc[(oof_df[column] > 0.527778) & (oof_df[column] <= 0.611111), column] = -0.555556
-        oof_df.loc[(oof_df[column] > 0.611111) & (oof_df[column] <= 0.722222), column] = -0.666667
-        oof_df.loc[(oof_df[column] > 0.722222) & (oof_df[column] <= 0.805556), column] = -0.777778
-        oof_df.loc[(oof_df[column] > 0.805556) & (oof_df[column] <= 0.861111), column] = -0.833333
-        oof_df.loc[(oof_df[column] > 0.861111) & (oof_df[column] <= 0.944445), column] = -0.888889
-        oof_df.loc[(oof_df[column] > 0.944445), column] = -1
+        oof_df.loc[tmp[column] <=  ((0.444444 + 0.333333)/2), column] = 0.333333
+        oof_df.loc[(tmp[column] > ((0.444444 + 0.333333)/2)) & (tmp[column] <= ((0.5 + 0.444444)/2)), column] = 0.444444
+        oof_df.loc[(tmp[column] > ((0.5 + 0.444444)/2)) & (tmp[column] <= ((0.555556 + 0.5)/2)), column] = 0.5
+        oof_df.loc[(tmp[column] > ((0.555556 + 0.5)/2)) & (tmp[column] <= ((0.666667 + 0.555556)/2)), column] = 0.555556
+        oof_df.loc[(tmp[column] > ((0.666667 + 0.555556)/2)) & (tmp[column] <= ((0.833333 + 0.666667)/2)), column] = 0.666667
+        oof_df.loc[(tmp[column] > ((0.833333 + 0.666667)/2)) & (tmp[column] <= ((0.888889 + 0.833333)/2)), column] = 0.833333
+        oof_df.loc[(tmp[column] > ((0.888889 + 0.833333)/2)) & (tmp[column] <= ((1 + 0.888889)/2)), column] = 0.888889
+        oof_df.loc[(tmp[column] > ((1 + 0.888889)/2)), column] = 1
         
-        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
         
         
     ################################################# handle type 4 columns      
     type_four_column_list = [
         'answer_satisfaction'
     ]
-    
+    scaler = MinMaxScaler(feature_range=(0.200000, 1))
     oof_df[type_four_column_list] = scaler.fit_transform(oof_df[type_four_column_list])
+    tmp[type_four_column_list] = scaler.fit_transform(tmp[type_four_column_list])
     
     for column in type_four_column_list:
         
-        oof_df.loc[oof_df[column] <= 0.233333, column] = -0.200000
-        oof_df.loc[(oof_df[column] > 0.233333) & (oof_df[column] <= 0.283333), column] = -0.266667
-        oof_df.loc[(oof_df[column] > 0.283333) & (oof_df[column] <= 0.316666), column] = -0.300000
-        oof_df.loc[(oof_df[column] > 0.316666) & (oof_df[column] <= 0.366666), column] = -0.333333
-        oof_df.loc[(oof_df[column] > 0.366666) & (oof_df[column] <= 0.433333), column] = -0.400000
-        oof_df.loc[(oof_df[column] > 0.433333) & (oof_df[column] <= 0.483333), column] = -0.466667
-        oof_df.loc[(oof_df[column] > 0.483333) & (oof_df[column] <= 0.516666), column] = -0.500000
-        oof_df.loc[(oof_df[column] > 0.516666) & (oof_df[column] <= 0.566666), column] = -0.533333
-        oof_df.loc[(oof_df[column] > 0.566666) & (oof_df[column] <= 0.633333), column] = -0.600000
-        oof_df.loc[(oof_df[column] > 0.633333) & (oof_df[column] <= 0.683333), column] = -0.666667
-        oof_df.loc[(oof_df[column] > 0.683333) & (oof_df[column] <= 0.716666), column] = -0.700000
-        oof_df.loc[(oof_df[column] > 0.716666) & (oof_df[column] <= 0.766666), column] = -0.733333
-        oof_df.loc[(oof_df[column] > 0.767666) & (oof_df[column] <= 0.833333), column] = -0.800000
-        oof_df.loc[(oof_df[column] > 0.833333) & (oof_df[column] <= 0.883333), column] = -0.866667
-        oof_df.loc[(oof_df[column] > 0.883333) & (oof_df[column] <= 0.916666), column] = -0.900000
-        oof_df.loc[(oof_df[column] > 0.916666) & (oof_df[column] <= 0.966666), column] = -0.933333
-        oof_df.loc[(oof_df[column] > 0.966666), column] = -1
-        
-        oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
+        oof_df.loc[tmp[column] <= ((0.266667 + 0.200000)/2), column] = 0.200000
+        oof_df.loc[(tmp[column] > ((0.266667 + 0.200000)/2)) & (tmp[column] <= ((0.300000 + 0.266667)/2)), column] = 0.266667
+        oof_df.loc[(tmp[column] > ((0.300000 + 0.266667)/2)) & (tmp[column] <= ((0.333333 + 0.300000)/2)), column] = 0.300000
+        oof_df.loc[(tmp[column] > ((0.333333 + 0.300000)/2)) & (tmp[column] <= ((0.400000 + 0.333333)/2)), column] = 0.333333
+        oof_df.loc[(tmp[column] > ((0.400000 + 0.333333)/2)) & (tmp[column] <= ((0.466667 + 0.400000)/2)), column] = 0.400000
+        oof_df.loc[(tmp[column] > ((0.466667 + 0.400000)/2)) & (tmp[column] <= ((0.500000 + 0.466667)/2)), column] = 0.466667
+        oof_df.loc[(tmp[column] > ((0.500000 + 0.466667)/2)) & (tmp[column] <= ((0.533333 + 0.500000)/2)), column] = 0.500000
+        oof_df.loc[(tmp[column] > ((0.533333 + 0.500000)/2)) & (tmp[column] <= ((0.600000 + 0.533333)/2)), column] = 0.533333
+        oof_df.loc[(tmp[column] > ((0.600000 + 0.533333)/2)) & (tmp[column] <= ((0.666667 + 0.600000)/2)), column] = 0.600000
+        oof_df.loc[(tmp[column] > ((0.666667 + 0.600000)/2)) & (tmp[column] <= ((0.700000 + 0.666667)/2)), column] = 0.666667
+        oof_df.loc[(tmp[column] > ((0.700000 + 0.666667)/2)) & (tmp[column] <= ((0.733333 + 0.700000)/2)), column] = 0.700000
+        oof_df.loc[(tmp[column] > ((0.733333 + 0.700000)/2)) & (tmp[column] <= ((0.800000 + 0.733333)/2)), column] = 0.733333
+        oof_df.loc[(tmp[column] > ((0.800000 + 0.733333)/2)) & (tmp[column] <= ((0.900000 + 0.800000)/2)), column] = 0.800000
+        oof_df.loc[(tmp[column] > ((0.900000 + 0.800000)/2)) & (tmp[column] <= ((0.933333 + 0.900000)/2)), column] = 0.900000
+        oof_df.loc[(tmp[column] > ((0.933333 + 0.900000)/2)) & (tmp[column] <= ((1 + 0.933333)/2)), column] = 0.933333
+        oof_df.loc[(tmp[column] > ((1 + 0.933333)/2)), column] = 1
     
     
     ################################################# round to i / 90 (i from 0 to 90)
-    oof_values = oof_df[target_columns].values
-    oof_values = np.around(oof_values * 90) / 90
-    oof_df[target_columns] = oof_values
+    oof_values = oof_df[TARGET_COLUMNS].values
+    DEGREE = 90
+
+    oof_values = np.around(oof_values * DEGREE) / DEGREE  ### 90 To be changed
+    oof_df[TARGET_COLUMNS] = oof_values
     
     return oof_df
 
@@ -581,38 +555,38 @@ if __name__ == "__main__":
                         seed=args.seed, \
                         split=args.split)
     
-    for fold in range(args.n_splits):
+    # for fold in range(args.n_splits):
         
-        # get train_data_loader and val_data_loader
-        train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
-        val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
+    #     # get train_data_loader and val_data_loader
+    #     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(fold, args.seed)
+    #     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(fold, args.seed)
 
-        if ((args.model_type == "bert") or (args.model_type == "xlnet")):
-            _, val_data_loader, tokenizer = get_train_val_loaders(train_data_path=train_data_path, \
-                                                        val_data_path=val_data_path, \
-                                                        model_type=args.model_name, \
-                                                        content=args.content, \
-                                                        max_len=args.max_len, \
-                                                        batch_size=args.batch_size, \
-                                                        val_batch_size=args.valid_batch_size, \
-                                                        num_workers=args.num_workers, \
-                                                        augment=args.augment, \
-                                                        extra_token=False)
-        else:
-            raise NotImplementedError
+    #     if ((args.model_type == "bert") or (args.model_type == "xlnet")):
+    #         _, val_data_loader, tokenizer = get_train_val_loaders(train_data_path=train_data_path, \
+    #                                                     val_data_path=val_data_path, \
+    #                                                     model_type=args.model_name, \
+    #                                                     content=args.content, \
+    #                                                     max_len=args.max_len, \
+    #                                                     batch_size=args.batch_size, \
+    #                                                     val_batch_size=args.valid_batch_size, \
+    #                                                     num_workers=args.num_workers, \
+    #                                                     augment=args.augment, \
+    #                                                     extra_token=False)
+    #     else:
+    #         raise NotImplementedError
 
-        get_oof(tokenizer, \
-                args.n_splits, \
-                fold, \
-                args.content, \
-                val_data_loader, \
-                args.model_type, \
-                args.model_name, \
-                args.hidden_layers, \
-                args.valid_batch_size, \
-                checkpoint_folder, \
-                args.seed, \
-                args.swa)
+    #     get_oof(tokenizer, \
+    #             args.n_splits, \
+    #             fold, \
+    #             args.content, \
+    #             val_data_loader, \
+    #             args.model_type, \
+    #             args.model_name, \
+    #             args.hidden_layers, \
+    #             args.valid_batch_size, \
+    #             checkpoint_folder, \
+    #             args.seed, \
+    #             args.swa)
     
     generate_oof_files(args.train_data_folder, \
                        args.n_splits, \

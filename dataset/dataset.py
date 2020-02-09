@@ -7,6 +7,7 @@ from torchvision import datasets, models, transforms
 from transformers import *
 from sklearn.utils import shuffle
 import random
+import html
 from math import floor, ceil
 from sklearn.model_selection import GroupKFold
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
@@ -110,6 +111,13 @@ class QuestDataset(torch.utils.data.Dataset):
             
             self.tokenizer = BertTokenizer.from_pretrained(model_type,\
                 additional_special_tokens = ["[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"])
+            
+        elif((self.model_type == "t5-base")):
+            
+            ADD_TOKEN_LIST = ['[TITLE]', '[BODY]','[CATEGORY]', '[DOMAIN]', '[HOST]']
+            self.tokenizer = T5Tokenizer.from_pretrained(model_type, additional_special_tokens=ADD_TOKEN_LIST )
+            self.tokenizer.cls_token = '[CLS]'
+            self.tokenizer.sep_token = '[SEP]'
             
         elif((self.model_type == "flaubert-base-uncased")):
             
@@ -314,6 +322,10 @@ class QuestDataset(torch.utils.data.Dataset):
     def trim_input(self, title, question, answer, max_sequence_length=512, 
                 t_max_len=30, q_max_len=int((512-30-4)/2), a_max_len=(512-30-4 - int((512-30-4)/2)), num_token=4):
 
+        question = html.unescape(question)
+        answer = html.unescape(answer)
+        title = html.unescape(title)
+        
         if self.augment:
             # print("title: ", title)
             title = self.augmentation(title, insert=False, substitute=True, swap=False, delete=True)
@@ -595,6 +607,21 @@ class QuestDataset(torch.utils.data.Dataset):
             else:
                 raise NotImplementedError
             
+        elif ((self.model_type == "t5-base")):
+            
+            if self.content == "Question_Answer":
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+            elif ((self.content == "Question") or (self.content == "Answer")):
+                if self.extra_token:
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+                else:
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
+            else:
+                raise NotImplementedError
+            
         elif ((self.model_type == "albert-base-v2") \
             or (self.model_type == "albert-large-v2") \
             or (self.model_type == "albert-xlarge-v2") \
@@ -621,7 +648,10 @@ class QuestDataset(torch.utils.data.Dataset):
         if len(token_ids) < self.max_len:
             token_ids += [0] * (self.max_len - len(token_ids))
         ids = torch.tensor(token_ids)
-        seg_ids = self.get_seg_ids(ids)
+        if self.model_type == "t5-base":
+            seg_ids = ids
+        else:
+            seg_ids = self.get_seg_ids(ids)
         return ids, seg_ids
     
     def get_seg_ids(self, ids):
