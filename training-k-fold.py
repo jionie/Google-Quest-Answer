@@ -52,9 +52,9 @@ parser.add_argument('--model_name', type=str, default="bert-base-uncased", \
 parser.add_argument('--content', type=str, default="Question", \
     required=False, help='specify the content for token')
 parser.add_argument("--max_len", type=int, default=512, required=False, help="specify the max_len of tokens")
-parser.add_argument('--hidden_layers', type=list, default=[-1], \
+parser.add_argument('--hidden_layers', type=list, default=[-3, -4, -5, -6, -7], \
     required=False, help='specify the hidden_layers for Loss')
-parser.add_argument('--optimizer', type=str, default='BertAdam', required=False, help='specify the optimizer')
+parser.add_argument('--optimizer', type=str, default='AdamW', required=False, help='specify the optimizer')
 parser.add_argument("--lr_scheduler", type=str, default='WarmupLinearSchedule', required=False, help="specify the lr scheduler")
 parser.add_argument("--warmup_proportion",  type=float, default=0.05, required=False, \
     help="Proportion of training to perform linear learning rate warmup for. " "E.g., 0.1 = 10%% of training.")
@@ -73,6 +73,7 @@ parser.add_argument('--load_pretrain', action='store_true', default=False, help=
 parser.add_argument('--fold', type=int, default=0, required=True, help="specify the fold for training")
 parser.add_argument('--seed', type=int, default=42, required=True, help="specify the seed for training")
 parser.add_argument('--n_splits', type=int, default=5, required=True, help="specify the n_splits for training")
+parser.add_argument('--early_stopping', type=int, default=3, required=False, help="specify how many epochs for early stopping doesn't increase")
 parser.add_argument('--split', type=str, default="GroupKfold", required=True, help="specify the splitting dataset way")
 parser.add_argument('--loss', type=str, default="mse", required=True, help="specify the loss for training")
 parser.add_argument('--augment', action='store_true', help="specify whether augmentation for training")
@@ -144,7 +145,8 @@ def training(
             seed,
             loss,
             extra_token, 
-            augment
+            augment, \
+            early_stopping
             ):
     
     torch.cuda.empty_cache()
@@ -261,6 +263,23 @@ def training(
                     n_host_classes=NUM_HOST_CLASS, \
                     hidden_layers=hidden_layers, \
                     extra_token=False)
+    elif model_type == "t5":
+        if extra_token:
+            model = QuestNet(model_type=model_name, \
+                    tokenizer=tokenizer, \
+                    n_classes=NUM_CLASS, \
+                    n_category_classes=NUM_CATEGORY_CLASS, \
+                    n_host_classes=NUM_HOST_CLASS, \
+                    hidden_layers=hidden_layers, \
+                    extra_token=True)
+        else:
+            model = QuestNet(model_type=model_name, \
+                    tokenizer=tokenizer, \
+                    n_classes=NUM_CLASS, \
+                    n_category_classes=NUM_CATEGORY_CLASS, \
+                    n_host_classes=NUM_HOST_CLASS, \
+                    hidden_layers=hidden_layers, \
+                    extra_token=False)
     else:
         raise NotImplementedError
     
@@ -273,7 +292,13 @@ def training(
             model = load(model, checkpoint_filepath)
 
     ############################################################################### optimizer
-    if ((model_type == "bert") or (model_type == "xlnet")) :
+    if model_name == "t5-base":
+        weight_decay = 0.9
+    else:
+        weight_decay = 0.01
+    
+    
+    if ((model_type == "bert") or (model_type == "xlnet") or (model_type == "t5")) :
         
         optimizer_grouped_parameters = []
         list_lr = []
@@ -535,7 +560,7 @@ def training(
                     optimizer_grouped_parameters.append({ \
                         'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
                         'lr': list_lr[i], \
-                        'weight_decay': 0.01})
+                        'weight_decay': weight_decay})
 
                     optimizer_grouped_parameters.append({ \
                         'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
@@ -549,7 +574,7 @@ def training(
                 optimizer_grouped_parameters.append({ \
                     'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
                     'lr': list_lr[i], \
-                    'weight_decay': 0.01})
+                    'weight_decay': weight_decay})
 
                 optimizer_grouped_parameters.append({ \
                     'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
@@ -562,7 +587,7 @@ def training(
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
-                'weight_decay': 0.01})
+                'weight_decay': weight_decay})
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
@@ -571,7 +596,7 @@ def training(
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
-                'weight_decay': 0.01})
+                'weight_decay': weight_decay})
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
@@ -581,7 +606,7 @@ def training(
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
-                'weight_decay': 0.01})
+                'weight_decay': weight_decay})
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
@@ -590,7 +615,7 @@ def training(
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if not any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
-                'weight_decay': 0.01})
+                'weight_decay': weight_decay})
             optimizer_grouped_parameters.append({ \
                 'params': [p for n, p in layer_parameters if any(nd in n for nd in no_decay)], \
                 'lr': 1e-6, \
@@ -604,7 +629,7 @@ def training(
         optimizer_grouped_parameters = [
             {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], \
              'lr': lr, \
-             'weight_decay': 0.01}, \
+             'weight_decay': weight_decay}, \
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], \
              'lr': lr, \
              'weight_decay': 0.0}
@@ -619,6 +644,8 @@ def training(
         optimizer = BertAdam(optimizer_grouped_parameters,
                              warmup=warmup_proportion,
                              t_total=num_train_optimization_steps)
+    elif optimizer_name == "AdamW":
+        optimizer = BertAdam(optimizer_grouped_parameters, eps=4e-5)
     elif optimizer_name == "FusedAdam":
         optimizer = FusedAdam(optimizer_grouped_parameters,
                               bias_correction=False)
@@ -627,10 +654,10 @@ def training(
     
     ############################################################################### lr_scheduler
     if lr_scheduler_name == "CosineAnealing":
+        num_train_optimization_steps = num_epoch * len(train_data_loader) // accumulation_steps
         scheduler = get_cosine_schedule_with_warmup(optimizer, \
-            num_warmup_steps=warmup_proportion, \
+            num_warmup_steps=int(num_train_optimization_steps*warmup_proportion), \
             num_training_steps=num_train_optimization_steps)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 12, eta_min=1e-5, last_epoch=-1)
         lr_scheduler_each_iter = False
     elif lr_scheduler_name == "WarmRestart":
         scheduler = WarmRestart(optimizer, T_max=5, T_mult=1, eta_min=1e-6)
@@ -657,6 +684,7 @@ def training(
     eval_step = len(train_data_loader) # or len(train_data_loader) 
     log_step = 50
     eval_count = 0
+    count = 0
 
     ############################################################################### training
     log.write('** start training here! **\n')
@@ -779,6 +807,7 @@ def training(
                     train_loss          = sum_train_loss / (sum_train + 1e-12)
                     sum_train_loss[...] = 0
                     sum_train[...]      = 0
+                    pred_train = np.nan_to_num(pred_train)
                     spearman            = Spearman(labels_train, pred_train)
                     log.write('lr: %f train loss: %f train_spearman: %f\n' % \
                         (rate, train_loss[0], spearman))
@@ -956,6 +985,14 @@ def training(
         
             np.savez_compressed(checkpoint_folder + '/probability_label_fold_' + str(fold) + '.uint8.npz', labels_val)
             np.savez_compressed(checkpoint_folder + '/probability_pred_fold_' + str(fold) + '.uint8.npz', pred_val)
+            
+            count = 0
+        
+        else:
+            count += 1
+            
+        if (count == early_stopping):
+            break
     
 
 
@@ -979,7 +1016,7 @@ if __name__ == "__main__":
     train_data_path = args.train_data_folder + "split/train_fold_%s_seed_%s.csv"%(args.fold, args.seed)
     val_data_path   = args.train_data_folder + "split/val_fold_%s_seed_%s.csv"%(args.fold, args.seed)
 
-    if ((args.model_type == "bert") or (args.model_type == "xlnet")):
+    if ((args.model_type == "bert") or (args.model_type == "xlnet") or (args.model_type == "t5")):
         
         if args.extra_token:
             test_data_path = args.train_data_folder + "test.csv"
@@ -1049,6 +1086,7 @@ if __name__ == "__main__":
             args.seed, \
             args.loss, \
             args.extra_token, \
-            args.augment)
+            args.augment, \
+            args.early_stopping)
 
     gc.collect()

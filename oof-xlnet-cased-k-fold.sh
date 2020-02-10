@@ -1,4 +1,4 @@
-python oof-k-fold.py --model_type "xlnet" --model_name "xlnet-base-cased" --content "Question_Answer" --seed 1997 --n_splits 5 --split "GroupKfold" --valid_batch_size 32 --loss "bce" --augment --swa --num_workers 4
+python oof-k-fold.py --model_type "xlnet" --model_name "xlnet-base-cased" --content "Question_Answer" --seed 2333 --n_splits 5 --split "GroupKfold" --valid_batch_size 32 --loss "bce" --augment --swa --num_workers 4
 
 
 # training using 768

@@ -9,6 +9,7 @@ from metric import *
 from file import *
 from include import *
 import pickle
+from scipy.stats import rankdata
 
 def seed_everything(seed=42):
     random.seed(seed)
@@ -156,11 +157,28 @@ def postprocess_special_columns(oof_df, special_columns):
             oof_df.loc[:, column] = -1 * oof_df.loc[:, column]
        
     return oof_df
+
+
+def rank_average(preds):
+    cols = range(30)
+    preds_avg = np.empty_like(preds[0])
+    for col in cols:
+        avg_rank = np.mean([rankdata(p[:, col], method='dense') for p in preds], axis=0).round(0).astype(int)
+        avg_rank = rankdata(avg_rank, method='dense')-1
+        nunique = np.unique(avg_rank).shape[0]
+        arrays = np.array([p[:,col] for p in preds])
+        ranges = arrays.min(), arrays.max()
+        uniform = np.linspace(ranges[0],ranges[1],nunique)
+        refined = np.array([uniform[i] for i in avg_rank])
+        preds_avg[:,col] = refined
+    return preds_avg
+
             
 
 def postprocessing(oof_df, target_columns):
     
     scaler = MinMaxScaler()
+    tmp = oof_df.copy(deep=True)
     
     ################################################# handle type 1 columns
     type_one_column_list = [
@@ -176,10 +194,21 @@ def postprocessing(oof_df, target_columns):
        'question_type_instructions'
     ]
     
+    type_one_column_norm_list = [
+       'question_conversational', \
+       'question_has_commonly_accepted_answer', \
+       'question_not_really_a_question', \
+       'question_opinion_seeking', \
+       'question_type_choice', \
+       'question_type_compare', \
+       'question_type_consequence', \
+       'question_type_entity', \
+       'question_type_instructions'
+    ]
     
-    oof_df[type_one_column_list] = scaler.fit_transform(oof_df[type_one_column_list])
     
-    tmp = oof_df.copy(deep=True)
+    oof_df[type_one_column_norm_list] = scaler.fit_transform(oof_df[type_one_column_norm_list])
+    tmp[type_one_column_norm_list] = scaler.fit_transform(tmp[type_one_column_norm_list])
     
     for column in type_one_column_list:
         
@@ -196,21 +225,44 @@ def postprocessing(oof_df, target_columns):
         'question_type_spelling'
     ]
     
-    for column in type_two_column_list:
+    # scaler = MinMaxScaler(feature_range=(0, 1))
+    # oof_df[type_two_column_list] = scaler.fit_transform(oof_df[type_two_column_list])
+    # tmp[type_two_column_list] = scaler.fit_transform(tmp[type_two_column_list])
+    
+    # for column in type_two_column_list:
    
-        oof_df.loc[tmp[column] <= ((0.333333 + 0)/2), column] = 0
-        oof_df.loc[(tmp[column] > ((0.333333 + 0)/2)) & (tmp[column] <= ((0.666667 + 0.333333)/2)), column] = 0.333333
-        oof_df.loc[(tmp[column] > ((0.666667 + 0.333333)/2)), column] = 0.666667
+    #     oof_df.loc[tmp[column] <= ((0.333333 + 0)/2), column] = 0
+    #     oof_df.loc[(tmp[column] > ((0.333333 + 0)/2)) & (tmp[column] <= ((0.666667 + 0.333333)/2)), column] = 0.333333
+    #     oof_df.loc[(tmp[column] > ((0.666667 + 0.333333)/2)), column] = 0.666667
+        
+    # for column in type_two_column_list:
+    #     if sum(tmp[column] > 0.15)>0:
+    #         oof_df.loc[tmp[column] <= ((0.333333 + 0)/2), column] = 0
+    #         oof_df.loc[(tmp[column] > ((0.333333 + 0)/2)) & (tmp[column] <= ((0.666667 + 0.333333)/2)), column] = 0.333333
+    #         oof_df.loc[(tmp[column] > ((0.666667 + 0.333333)/2)), column] = 0.666667
+    #     else:
+    #         t1 = max(int(len(tmp[column])*0.0013),2)
+    #         t2 = max(int(len(tmp[column])*0.0008),1)
+    #         thred1 = sorted(list(tmp[column]))[-t1]
+    #         thred2 = sorted(list(tmp[column]))[-t2]
+    #         oof_df.loc[tmp[column] <= thred1, column] = 0
+    #         oof_df.loc[(tmp[column] > thred1) & (tmp[column] <= thred2), column] = 0.333333
+    #         oof_df.loc[(tmp[column] > thred2), column] = 0.666667
 
     
     
     ################################################# handle type 3 columns      
     type_three_column_list = [
-       'question_interestingness_self', 
+       'question_interestingness_self', \
     ]
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    oof_df[type_three_column_list] = scaler.fit_transform(oof_df[type_three_column_list])
-    tmp[type_three_column_list] = scaler.fit_transform(tmp[type_three_column_list])
+    
+    type_one_column_norm_list = [
+       'question_interestingness_self', \
+    ]
+    
+    scaler = MinMaxScaler(feature_range=(0.333333, 1))
+    oof_df[type_one_column_norm_list] = scaler.fit_transform(oof_df[type_one_column_norm_list])
+    tmp[type_one_column_norm_list] = scaler.fit_transform(tmp[type_one_column_norm_list])
     
     for column in type_three_column_list:
         oof_df.loc[tmp[column] <=  ((0.444444 + 0.333333)/2), column] = 0.333333
@@ -254,7 +306,7 @@ def postprocessing(oof_df, target_columns):
     
     ################################################# round to i / 90 (i from 0 to 90)
     oof_values = oof_df[TARGET_COLUMNS].values
-    DEGREE = 90
+    DEGREE = len(oof_df)//45*9
 
     oof_values = np.around(oof_values * DEGREE) / DEGREE  ### 90 To be changed
     oof_df[TARGET_COLUMNS] = oof_values
@@ -278,11 +330,11 @@ def postprocessing_v2(oof_df):
     type_one_column_list = [
        'question_conversational', \
        'question_has_commonly_accepted_answer', \
-    #    'question_not_really_a_question', \
+       'question_not_really_a_question', \
        'question_type_choice', \
        'question_type_compare', \
        'question_type_consequence', \
-    #    'question_type_definition', \
+       'question_type_definition', \
        'question_type_entity', \
        'question_type_instructions', 
     ]
@@ -296,29 +348,29 @@ def postprocessing_v2(oof_df):
         oof_df.loc[tmp[column] <= 0.16667, column] = 0
         oof_df.loc[(tmp[column] > 0.16667) & (tmp[column] <= 0.41667), column] = 0.333333
         oof_df.loc[(tmp[column] > 0.41667) & (tmp[column] <= 0.58333), column] = 0.500000
-        oof_df.loc[(tmp[column] > 0.58333) & (tmp[column] <= 0.83333), column] = 0.666667
-        oof_df.loc[(tmp[column] > 0.83333), column] = 1
+        oof_df.loc[(tmp[column] > 0.58333) & (tmp[column] <= 0.73333), column] = 0.666667
+        oof_df.loc[(tmp[column] > 0.73333), column] = 1
     
     
     
     ################################################# handle type 2 columns      
-#     type_two_column_list = [
-#         'question_type_spelling'
-#     ]
+    type_two_column_list = [
+        'question_type_spelling'
+    ]
     
-#     for column in type_two_column_list:
-#         if sum(tmp[column] > 0.15)>0:
-#             oof_df.loc[tmp[column] <= 0.15, column] = 0
-#             oof_df.loc[(tmp[column] > 0.15) & (tmp[column] <= 0.45), column] = 0.333333
-#             oof_df.loc[(tmp[column] > 0.45), column] = 0.666667
-#         else:
-#             t1 = max(int(len(tmp[column])*0.0013),2)
-#             t2 = max(int(len(tmp[column])*0.0008),1)
-#             thred1 = sorted(list(tmp[column]))[-t1]
-#             thred2 = sorted(list(tmp[column]))[-t2]
-#             oof_df.loc[tmp[column] <= thred1, column] = 0
-#             oof_df.loc[(tmp[column] > thred1) & (tmp[column] <= thred2), column] = 0.333333
-#             oof_df.loc[(tmp[column] > thred2), column] = 0.666667
+    for column in type_two_column_list:
+        if sum(tmp[column] > 0.15)>0:
+            oof_df.loc[tmp[column] <= 0.15, column] = 0
+            oof_df.loc[(tmp[column] > 0.15) & (tmp[column] <= 0.45), column] = 0.333333
+            oof_df.loc[(tmp[column] > 0.45), column] = 0.666667
+        else:
+            t1 = max(int(len(tmp[column])*0.0013),2)
+            t2 = max(int(len(tmp[column])*0.0008),1)
+            thred1 = sorted(list(tmp[column]))[-t1]
+            thred2 = sorted(list(tmp[column]))[-t2]
+            oof_df.loc[tmp[column] <= thred1, column] = 0
+            oof_df.loc[(tmp[column] > thred1) & (tmp[column] <= thred2), column] = 0.333333
+            oof_df.loc[(tmp[column] > thred2), column] = 0.666667
     
     
     
@@ -373,9 +425,9 @@ def postprocessing_v2(oof_df):
     ################################################# round to i / 90 (i from 0 to 90)
     oof_values = oof_df[TARGET_COLUMNS].values
     DEGREE = len(oof_df)//45*9
-    # if degree:
-    #     DEGREE = degree
-    # DEGREE = 90
+#     if degree:
+#         DEGREE = degree
+#     DEGREE = 90
     oof_values = np.around(oof_values * DEGREE) / DEGREE  ### 90 To be changed
     oof_df[TARGET_COLUMNS] = oof_values
     
@@ -395,16 +447,19 @@ if __name__ == "__main__":
     oof_roberta_base = pd.read_csv(model_folder + "oof_roberta_base_swa.csv")
 
     
-    oof_df = ((oof_bert_base_cased[TARGET_COLUMNS] + oof_bert_base_cased_two_model[TARGET_COLUMNS]) / 2 + \
-              (oof_bert_base_uncased[TARGET_COLUMNS] + oof_bert_base_uncased_two_model[TARGET_COLUMNS]) / 2 + \
-              (oof_xlnet_base_cased[TARGET_COLUMNS] + oof_xlnet_base_cased_two_model[TARGET_COLUMNS]) / 2 + \
-              (oof_roberta_base_two_model[TARGET_COLUMNS] + oof_roberta_base[TARGET_COLUMNS]) / 2   
-               )/4.0
+    oof_df = 0.25 * (0.5 * oof_bert_base_cased[TARGET_COLUMNS] + 0.5 * oof_bert_base_cased_two_model[TARGET_COLUMNS]) + \
+                0.25 * (0.5 * oof_bert_base_uncased[TARGET_COLUMNS] + 0.5 * oof_bert_base_uncased_two_model[TARGET_COLUMNS]) + \
+                0.25 * (0.5 * oof_xlnet_base_cased[TARGET_COLUMNS] + 0.5 * oof_xlnet_base_cased_two_model[TARGET_COLUMNS]) + \
+                0.25 * (0.5 * oof_roberta_base[TARGET_COLUMNS] + 0.5 * oof_roberta_base_two_model[TARGET_COLUMNS])   
+              
     
 
 
     train_df = pd.read_csv("/media/jionie/my_disk/Kaggle/Google_Quest_Answer/input/google-quest-challenge/train.csv")
     oof_df["category"] = train_df["category"]
+    
+    # oof_df[TARGET_COLUMNS] = rank_average(oof_df[TARGET_COLUMNS].values)
+    
     oof_df = postprocessing(oof_df, TARGET_COLUMNS)
     # oof_df = postprocessing_v2(oof_df)
 
@@ -419,47 +474,77 @@ if __name__ == "__main__":
     #         'question_type_spelling'] = 1
     
     vocab_list_large = [
-    'pronounced', 'pronounce', 'pronunciation', 'correct adjective', 'How many syllables', 'spell'
+    'pronounced', 'pronounce', 'pronunciation', 'adjective', 'syllables', 'spell', 'sounds', 'Ngram', 'verb'
     ]
     def rule_large(x):
-        if x == 0:
+        if x < 3:
             return 0.0
-        elif x == 1:
+        elif x < 6:
             return 1/3
         else:
             return 2/3
         
-    vocab_list_base = [
-        'sound', 'prefix', 'adjective', 'verb', 'noun', 'word', 'Ngram', 'conversation', 'syllable'
-    ]
-    def rule_base(x):
-        if x == 0:
-            return 0.0
-        elif x == 1:
-            return 1/64
-        else:
-            return 1/32
-        
-    y_preds_question_type_spelling = (
-        train_df['question_title'].apply(
-            lambda x: sum([x.count(vocab) for vocab in vocab_list_large])
-        ) + train_df['question_body'].apply(
-            lambda x: sum([x.count(vocab) for vocab in vocab_list_large])
-        )).apply(rule_large) + (train_df['question_title'].apply(
-            lambda x: sum([x.count(vocab) for vocab in vocab_list_base])
-        ) + train_df['question_body'].apply(
-            lambda x: sum([x.count(vocab) for vocab in vocab_list_base])
-        )).apply(rule_base)
+    y_preds_question_type_spelling = (train_df['question_body'].apply(lambda x: sum([x.count(vocab) for vocab in vocab_list_large]))\
+        ).apply(rule_large)
             
-    y_preds_question_type_spelling = y_preds_question_type_spelling
-
-    # oof_df['question_type_spelling'] = y_preds_question_type_spelling
+    
+    y_preds_question_type_spelling_copy = list(y_preds_question_type_spelling)
     
     n = train_df['url'].apply(lambda x:(('ell.stackexchange.com' in x) or ('english.stackexchange.com' in x))).tolist()
-
-    for idx, x in enumerate(n):
+    spelling=[]
+    for x in n:
         if x:
-            oof_df.loc[idx, 'question_type_spelling'] = 0.5
+            spelling.append(1/3)
+        else:
+            spelling.append(0.)
+    
+    oof_df['question_type_spelling'] = spelling
+       
+    # if (len(set(y_preds_question_type_spelling)) == 1):
+    #     oof_df['question_type_spelling'] = spelling
+    # else:
+    #     oof_df['question_type_spelling'] = y_preds_question_type_spelling
+        
+    # for i in range(len(spelling)):
+    #     if (spelling[i] != 0):
+    #         oof_df.loc[i, 'question_type_spelling'] = spelling[i]
+    #         break
+        
+    # for i in range(len(spelling)-1, 0, -1):
+    #     if (spelling[i] != 0):
+    #         oof_df.loc[i, 'question_type_spelling'] = spelling[i] * 2
+    #         break
+            
+    # vocab_list_base = [
+    #     'sound', 'prefix', 'adjective', 'verb', 'noun', 'word', 'Ngram', 'conversation', 'syllable'
+    # ]
+    # def rule_base(x):
+    #     if x == 0:
+    #         return 0.0
+    #     elif x == 1:
+    #         return 1/64
+    #     else:
+    #         return 1/32
+        
+    # y_preds_question_type_spelling = (
+    #     train_df['question_title'].apply(
+    #         lambda x: sum([x.count(vocab) for vocab in vocab_list_large])
+    #     ) + train_df['question_body'].apply(
+    #         lambda x: sum([x.count(vocab) for vocab in vocab_list_large])
+    #     )).apply(rule_large) + (train_df['question_title'].apply(
+    #         lambda x: sum([x.count(vocab) for vocab in vocab_list_base])
+    #     ) + train_df['question_body'].apply(
+    #         lambda x: sum([x.count(vocab) for vocab in vocab_list_base])
+    #     )).apply(rule_base)
+    
+    print(oof_df['question_type_spelling'].value_counts())
+    
+    # n = train_df['url'].apply(lambda x:(('ell.stackexchange.com' in x) or ('english.stackexchange.com' in x))).tolist()
+
+    # for idx, x in enumerate(n):
+    #     if x:
+    #         if (oof_df.loc[idx, 'category'] == 'CULTURE'):
+    #             oof_df.loc[idx, 'question_type_spelling'] = 1/3
     
     spearman, spearman_list = Spearman(train_df[TARGET_COLUMNS].values, oof_df[TARGET_COLUMNS].values)
     

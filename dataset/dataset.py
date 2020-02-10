@@ -115,7 +115,7 @@ class QuestDataset(torch.utils.data.Dataset):
         elif((self.model_type == "t5-base")):
             
             ADD_TOKEN_LIST = ['[TITLE]', '[BODY]','[CATEGORY]', '[DOMAIN]', '[HOST]']
-            self.tokenizer = T5Tokenizer.from_pretrained(model_type, additional_special_tokens=ADD_TOKEN_LIST )
+            self.tokenizer = T5Tokenizer.from_pretrained(model_type, additional_special_tokens=ADD_TOKEN_LIST)
             self.tokenizer.cls_token = '[CLS]'
             self.tokenizer.sep_token = '[SEP]'
             
@@ -137,7 +137,24 @@ class QuestDataset(torch.utils.data.Dataset):
             
         elif((self.model_type == "roberta-base")):
             
+            ADD_TOKEN_LIST = ['[TITLE]', '[BODY]', '[ANSWER]', '[CATEGORY]', '[DOMAIN]', '[HOST]', \
+                '[category:LIFE_ARTS]', 
+                '[category:CULTURE]', 
+                '[category:SCIENCE]', 
+                '[category:STACKOVERFLOW]', 
+                '[category:TECHNOLOGY]', 
+                '[domain:stackexchange]',
+                '[domain:stackoverflow]',
+                '[domain:askubuntu]',
+                '[domain:serverfault]',
+                '[domain:superuser]',
+                '[domain:mathoverflow]'] + list(df.host.unique())
             self.tokenizer = RobertaTokenizer.from_pretrained(self.model_type)
+            self.tokenizer.cls_token = '[CLS]'
+            self.tokenizer.sep_token = '[SEP]'
+            num_added_tokens = self.tokenizer.add_tokens(ADD_TOKEN_LIST)
+            print('Number of Tokens Added : ', num_added_tokens)
+
             
         elif((self.model_type == "albert-base-v2") or (self.model_type == "albert-large-v2") \
             or (self.model_type == "albert-xlarge-v2") \
@@ -434,6 +451,10 @@ class QuestDataset(torch.utils.data.Dataset):
         if self.extra_token:
             num_token = 6
         else:
+            # if self.model_type == "roberta-base":
+            #     num_token = 11
+            # else:
+            #     num_token = 4
             num_token = 4
         
         if self.content == "Question":
@@ -596,14 +617,18 @@ class QuestDataset(torch.utils.data.Dataset):
             
             if self.content == "Question_Answer":
                 if self.extra_token:
-                    tokens = ['<s>'] + ['<s>'] + ['<s>'] + t_tokens + ['</s>'] + q_tokens + ['</s>'] + a_tokens + ['</s>']
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
                 else:
-                    tokens = ['<s>'] + t_tokens + ['</s>'] + q_tokens + ['</s>'] + a_tokens + ['</s>']
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + q_tokens + ['[SEP]'] + a_tokens + ['[SEP]']
+                    # tokens =  ['[CLS]']  + ['[CATEGORY]'] + ['[category:{}]'.format(row['category'])] + \
+                    #                 ['[DOMAIN]'] + ['[domain:{}]'.format(row['host'].split('.')[-2])] + \
+                    #                 ['[HOST]'] + [row['host']] + ['[TITLE]'] + t_tokens + ['[BODY]'] + \
+                    #                 q_tokens + ['[ANSWER]'] + a_tokens + ['[SEP]']
             elif ((self.content == "Question") or (self.content == "Answer")):
                 if self.extra_token:
-                    tokens = ['<s>'] + ['<s>'] + ['<s>'] + t_tokens + ['</s>'] + c_tokens + ['</s>']
+                    tokens = ['[CLS]'] + ['[CLS]'] + ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
                 else:
-                    tokens = ['<s>'] + t_tokens + ['</s>'] + c_tokens + ['</s>']
+                    tokens = ['[CLS]'] + t_tokens + ['[SEP]'] + c_tokens + ['[SEP]']
             else:
                 raise NotImplementedError
             
