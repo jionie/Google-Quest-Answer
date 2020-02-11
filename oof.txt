@@ -1,0 +1,13 @@
+bert-base-uncased-swa oof_spearman: 0.403928, seed 2020, 10 fold (need to use Ivan's new 5 folds)
+bert-base-uncased-swa-ivan oof_spearman: 0.401410, seed 1010, 5 fold
+bert-base-uncased-swa-two-model oof_spearman: 0.404822, seed 2020, 5 fold
+bert-base-cased-swa oof_spearman: 0.403596, seed 1996, 10 fold (need to use Ivan's new 5 folds)
+bert-base-cased-swa-ivan oof_spearman: 0.400142, seed 726, 5 fold
+bert-base-cased-swa-two-model oof_spearman: 0.405100, seed 1996, 5 fold
+xlnet-base-cased oof_spearman: 0.395807, seed 1997, 5 fold
+xlnet-base-cased-swa-v2 oof_spearman: 0.398455, seed 2333, 5 fold
+xlnet-base-cased-swa-two-model oof_spearman: 0.410154, seed 1997, 5 fold
+roberta-base-swa oof_spearman: 0.395185, seed 2345, 5 fold
+roberta-base-swa-two-model oof_spearman: 0.412353, seed 123, 5 fold
+
+
